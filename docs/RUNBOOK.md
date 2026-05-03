@@ -1,0 +1,136 @@
+# MrQ Live Activation Platform — Operations Runbook
+
+## Railway Cron Schedules
+
+Two cron jobs are configured as sibling services in Railway. Neither is a long-lived process — each spins up, runs, and exits.
+
+```
+# Daily retention purge (registrations past activation lifecycle, audit logs,
+# password tokens). 03:00 UTC.
+0 3 * * *    pnpm tsx workers/retentionPurge.ts
+
+# Hourly PENDING sweep (abandoned registrations older than 24h). At minute 7
+# to avoid clashing with top-of-hour load.
+7 * * * *    pnpm tsx workers/pendingPurge.ts
+```
+
+Both scripts read `DATABASE_URL` from the Railway secret store. If either fails, stderr lands in Railway logs; a manual re-run is the recovery. The two are deliberately separate scripts so a failure in one does not block the other.
+
+---
+
+## Procedures
+
+### DSAR (Data Subject Access Request)
+
+1. Receive the DSAR request from Compliance with a ticket reference (e.g. `DSAR-2024-001`).
+2. Log into the admin console at `https://admin.mrqlive.co.uk`.
+3. Navigate to **Admin → DSAR** (`/admin/dsar`). This page is ADMIN-only; MEMBERs cannot access it.
+4. Enter the participant's email address and the request reference from step 1.
+5. Click **Search**. The page shows the registration count and which activations they belong to.
+6. If registrations are found, click **Download DSAR CSV**. The download triggers the export and writes an `AuditLog` row (`action = "dsar.fulfilled"`, `metadata.rowCount`, `metadata.requestRef`). If no registrations are found, the page surfaces "No registrations found" — no download is required, but the search itself is recorded in the audit log automatically when you click Download (even for zero rows).
+7. Deliver the CSV to the data subject via your Compliance-approved channel. Do not send it by email directly.
+
+**Note:** The right to rectification is not in scope — registrations capture only email, booth, and UTM parameters. Correcting these post hoc would invalidate the audit trail.
+
+---
+
+### Erasure (Right to Be Forgotten)
+
+1. Receive the erasure request from Compliance with a ticket reference (e.g. `ERASURE-2024-001`).
+2. Log into the admin console at `https://admin.mrqlive.co.uk`.
+3. Navigate to **Admin → Erasure** (`/admin/erasure`). This page is ADMIN-only.
+4. Enter the participant's email address and the request reference.
+5. Click **Preview erasure**. The page shows how many registrations will be deleted and which activations they belong to.
+6. Review the preview. Enter a free-text reason (e.g. "Data subject requested erasure per Art. 17 GDPR") and type the confirmation phrase `ERASE PARTICIPANT DATA` exactly.
+7. Click **Confirm erasure**. The server validates the typed phrase independently of the client — dropping the client-side check does not bypass the server guard.
+8. On success the page shows the count of erased registrations and the request reference. The `AuditLog` row (`action = "erasure.fulfilled"`) is written atomically **before** the deletion so a post-erasure audit query proves the action occurred.
+9. `AuditLog` entries referencing the participant by `emailHash` are **not** erased. Audit log retention is governed by the two-year window in §14.1. This is permitted under GDPR Art. 17(3)(e).
+
+---
+
+### Resend API Key Rotation
+
+1. In the Resend dashboard, create a new API key with the same send permissions as the current one.
+2. In Railway's secret store, update `RESEND_API_KEY` to the new key.
+3. Trigger a redeploy (or Railway will pick it up on the next deploy).
+4. Verify a test email sends successfully.
+5. Revoke the old key in the Resend dashboard.
+
+**When to rotate:** Any team-member offboarding; any suspected key compromise.
+
+---
+
+### HMAC Key Rotation
+
+All HMAC keys in Phase 1 are non-rotating by design (see §14.4). Rotating them has different consequences per key:
+
+| Key | Consequence of rotation | Safe to rotate? |
+|-----|------------------------|-----------------|
+| `EMAIL_HASH_HMAC_KEY` | Existing `emailHash` values become stale; dedup and right-to-erasure-by-hash break | No — requires a full re-hash migration |
+| `IP_HMAC_KEY` | Existing `ipHash`/`userAgentHash` become stale | Yes — only affects future lookups |
+| `OTP_HMAC_KEY` | In-flight OTPs (10-min TTL) are invalidated | Yes — participants retry registration |
+| `PENDING_TOKEN_SECRET` | In-flight registration→verify hops are invalidated | Yes — participants retry registration |
+| `INVITE_TOKEN_HMAC_KEY` | In-flight invite links are invalidated | Yes — ADMIN re-issues from Users page |
+| `RESET_TOKEN_HMAC_KEY` | In-flight password reset links are invalidated | Yes — participant re-requests reset |
+
+To rotate a safe key: update the value in Railway's secret store and redeploy. Inform affected users to retry their in-progress action.
+
+To rotate `EMAIL_HASH_HMAC_KEY` (not done in Phase 1): requires a database migration that recomputes `emailHash` for every `Registration` row using the new key before the old key is removed.
+
+---
+
+### Sign Out All Admins
+
+Rotating `NEXTAUTH_SECRET` invalidates all active admin sessions.
+
+1. Generate a new secret: `openssl rand -base64 48`
+2. Update `NEXTAUTH_SECRET` in Railway's secret store.
+3. Redeploy. All admins are signed out immediately.
+4. Notify the team to re-authenticate.
+
+**When to use:** Suspected session compromise; any time the entire admin team needs to re-authenticate (e.g. after a security incident).
+
+---
+
+### Bootstrap Admin Recovery
+
+If the first admin account is lost and no other ADMIN exists:
+
+1. Set `BOOTSTRAP_ADMIN_EMAIL` in Railway's environment variables to the email of the new admin.
+2. Run the seed script: `pnpm prisma db seed` (or trigger it via Railway's Run command on the app service).
+3. The seed creates a fresh invite link and logs the URL to stdout. Copy the URL from Railway's deploy logs.
+4. The invited user completes onboarding via the invite link.
+5. Remove `BOOTSTRAP_ADMIN_EMAIL` from Railway's environment after first use.
+
+**Note:** Re-running the seed against an existing database is safe — the seed is idempotent and only creates the invite if no ADMIN users exist.
+
+---
+
+## Environment Variables
+
+All variables are validated by `lib/env.ts` at boot. A missing variable crashes the process before serving traffic.
+
+See `src/resource/MRQ_LIVE_ACTIVATION_LITE_MASTER_PROMPT_V5.md` §15 for the full list and notes. Key production values:
+
+| Variable | Where | Notes |
+|----------|-------|-------|
+| `NEXTAUTH_URL` | Railway admin service | `https://admin.mrqlive.co.uk` |
+| `PUBLIC_BASE_URL` | Railway admin service | `https://mrqlive.co.uk` |
+| `PARTICIPANT_HOST` | Railway admin service | `mrqlive.co.uk` |
+| `ADMIN_HOST` | Railway admin service | `admin.mrqlive.co.uk` |
+| `BOOTSTRAP_ADMIN_EMAIL` | Railway admin service | One-shot; remove after first deploy |
+
+---
+
+## Production Smoke Test
+
+After each production deploy, run the following against `https://mrqlive.co.uk`:
+
+1. Create a test activation in the admin console with status `LIVE`.
+2. Register with a test email address via the participant landing page.
+3. Retrieve the OTP from the Resend dashboard (or the test inbox) and verify.
+4. Confirm the `LiveCounter` on the dashboard increments to 1 verified.
+5. Download the registrations CSV and confirm the test row is present.
+6. Navigate to **Admin → Erasure** and erase the test email. Confirm the audit log entry.
+
+This rehearses the full GDPR loop and confirms email delivery is working on production.

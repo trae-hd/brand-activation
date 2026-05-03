@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ActivationStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  ENDED
+}
+
+enum AdminRole {
+  ADMIN
+  MEMBER
+}
+
+enum RegistrationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
+enum AuditCategory {
+  ADMIN
+  SECURITY
+}
+
+model Activation {
+  id        String           @id @default(cuid())
+  slug      String           @unique
+  name      String
+  status    ActivationStatus @default(DRAFT)
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  /// Tiptap ProseMirror tree for the landing page (loose allowlist — see §9.2).
+  content Json
+  /// Tiptap ProseMirror tree for the consent / privacy notice (tight allowlist — see §9.2).
+  consentNotice Json
+  /// SHA-256 of the canonicalised consentNotice JSON. Recomputed on every save.
+  consentVersion String
+
+  /// Optional hex colour for the landing page primary accent (e.g. "#FF3366").
+  primaryColor String?
+  /// Optional URL of a hero image for the landing page.
+  heroImageUrl String?
+
+  legalApproved      Boolean   @default(false)
+  legalApprovedAt    DateTime?
+  legalApprovedBy    AdminUser? @relation("LegalApprover", fields: [legalApprovedById], references: [id])
+  legalApprovedById  String?
+  legalApprovalNotes String?
+
+  createdAt   DateTime  @default(now())
+  createdBy   AdminUser @relation("ActivationCreator", fields: [createdById], references: [id])
+  createdById String
+  updatedAt   DateTime  @updatedAt
+
+  registrations Registration[]
+  booths        Booth[]
+
+  @@index([status, startsAt])
+  @@index([slug])
+}
+
+model Booth {
+  id           String     @id @default(cuid())
+  activation   Activation @relation(fields: [activationId], references: [id], onDelete: Cascade)
+  activationId String
+  code         String
+  label        String
+  createdAt    DateTime   @default(now())
+
+  @@unique([activationId, code])
+}
+
+model Registration {
+  id           String     @id @default(cuid())
+  activation   Activation @relation(fields: [activationId], references: [id])
+  activationId String
+
+  /// Plaintext email. Encryption at rest deferred to Phase 2 (§14.0).
+  email     String
+  /// HMAC-SHA256(email_lowercased) using EMAIL_HASH_HMAC_KEY (non-rotating).
+  emailHash String
+
+  status    RegistrationStatus @default(PENDING)
+  boothCode String?
+  utmSource String?
+  utmMedium String?
+  utmCampaign String?
+
+  ipHash        String
+  userAgentHash String
+
+  /// SHA-256 of the consent notice content the participant accepted.
+  consentVersion    String
+  consentAcceptedAt DateTime
+
+  registeredAt DateTime  @default(now())
+  verifiedAt   DateTime?
+
+  @@unique([activationId, emailHash])
+  @@index([activationId, status])
+  @@index([registeredAt])
+  @@index([emailHash])
+}
+
+model AuditLog {
+  id         String        @id @default(cuid())
+  category   AuditCategory
+  action     String
+  actor      AdminUser?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorId    String?
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ipHash     String?
+  createdAt  DateTime      @default(now())
+
+  @@index([category, createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  role         AdminRole
+  active       Boolean   @default(true)
+
+  /// bcrypt hash, cost 12. Null until invite is consumed or Google SSO links the row.
+  passwordHash String?
+
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  activationsCreated       Activation[]        @relation("ActivationCreator")
+  activationsLegalApproved Activation[]        @relation("LegalApprover")
+  auditLogsAuthored        AuditLog[]          @relation("AuditActor")
+  invitesIssued            AdminInvite[]       @relation("InviteIssuer")
+  invitesReceived          AdminInvite[]       @relation("InviteSubject")
+  passwordResetsIssued     PasswordResetToken[] @relation("ResetIssuer")
+  passwordResetsReceived   PasswordResetToken[] @relation("ResetSubject")
+
+  @@index([role, active])
+}
+
+/// One row per invitation. Creates the AdminUser row up-front; the invite link
+/// only job is to attach a password. Distinct from PasswordResetToken — see §5.1.
+model AdminInvite {
+  id String @id @default(cuid())
+
+  /// HMAC-SHA256(rawToken) using INVITE_TOKEN_HMAC_KEY. Raw token is emailed; never stored.
+  tokenHash String    @unique
+  subject   AdminUser @relation("InviteSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId String
+  issuer    AdminUser @relation("InviteIssuer", fields: [issuerId], references: [id])
+  issuerId  String
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([subjectId, consumedAt])
+  @@index([expiresAt])
+}
+
+/// One row per password-reset request. Uses RESET_TOKEN_HMAC_KEY (not INVITE_TOKEN_HMAC_KEY)
+/// so a token of one class cannot be accepted as the other at the lookup layer.
+model PasswordResetToken {
+  id String @id @default(cuid())
+
+  /// HMAC-SHA256(rawToken) using RESET_TOKEN_HMAC_KEY.
+  tokenHash String    @unique
+  subject   AdminUser @relation("ResetSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectId String
+  issuer    AdminUser @relation("ResetIssuer", fields: [issuerId], references: [id])
+  issuerId  String
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([subjectId, consumedAt])
+  @@index([expiresAt])
+}

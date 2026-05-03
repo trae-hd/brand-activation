@@ -1,0 +1,4 @@
+# All crawlers are blocked. This app is internal-only; public indexing would
+# expose admin routes and leak the existence of activation slugs.
+User-agent: *
+Disallow: /
