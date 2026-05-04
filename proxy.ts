@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-
-const ADMIN_HOST = "admin.mrqlive.co.uk";
-const PARTICIPANT_HOST = "mrqlive.co.uk";
+import { env } from "@/lib/env";
 
 export function proxy(req: NextRequest) {
+  const adminHost = env.ADMIN_HOST.toLowerCase();
+  const participantHost = env.PARTICIPANT_HOST.toLowerCase();
   const host = req.headers.get("host")?.toLowerCase() ?? "";
   const path = req.nextUrl.pathname;
 
@@ -17,17 +17,17 @@ export function proxy(req: NextRequest) {
 
   // NextAuth handler is reachable only on the admin host.
   if (path.startsWith("/api/auth/")) {
-    return host === ADMIN_HOST ? NextResponse.next() : new NextResponse(null, { status: 404 });
+    return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
   // tRPC handler is reachable only on the admin host.
   if (path.startsWith("/api/trpc/")) {
-    return host === ADMIN_HOST ? NextResponse.next() : new NextResponse(null, { status: 404 });
+    return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
   // Participant Route Handlers are reachable only on the participant host.
   if (path === "/api/register" || path === "/api/verify") {
-    return host === PARTICIPANT_HOST ? NextResponse.next() : new NextResponse(null, { status: 404 });
+    return host === participantHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
   // Admin pages: only on admin host.
@@ -38,11 +38,11 @@ export function proxy(req: NextRequest) {
     path.startsWith("/admin/") ||
     path.startsWith("/auth/")
   ) {
-    return host === ADMIN_HOST ? NextResponse.next() : new NextResponse(null, { status: 404 });
+    return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
   // Everything else (participant pages: /:slug, /:slug/verify, etc.) is participant-host only.
-  return host === PARTICIPANT_HOST ? NextResponse.next() : new NextResponse(null, { status: 404 });
+  return host === participantHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
 }
 
 export const config = {

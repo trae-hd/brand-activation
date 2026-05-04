@@ -49,12 +49,17 @@ const schema = z.object({
   SENTRY_DSN: z.string().url().optional(),
 });
 
+type Env = z.infer<typeof schema>;
+
 // During `next build` on Railway, runtime variables are not injected into the
 // build container. SKIP_ENV_VALIDATION=1 lets the build complete; validation
 // still runs at server startup where all variables must be present.
-if (!process.env.SKIP_ENV_VALIDATION) {
-  const parsed = schema.safeParse(process.env);
+function loadEnv(): Env {
+  if (process.env.SKIP_ENV_VALIDATION) {
+    return process.env as unknown as Env;
+  }
 
+  const parsed = schema.safeParse(process.env);
   if (!parsed.success) {
     console.error(
       "❌  Invalid environment variables:\n",
@@ -64,6 +69,7 @@ if (!process.env.SKIP_ENV_VALIDATION) {
       "Invalid environment variables — copy .env.example to .env.local and fill in values.",
     );
   }
+  return parsed.data;
 }
 
-export const env = schema.parse(process.env);
+export const env = loadEnv();
