@@ -49,16 +49,21 @@ const schema = z.object({
   SENTRY_DSN: z.string().url().optional(),
 });
 
-const parsed = schema.safeParse(process.env);
+// During `next build` on Railway, runtime variables are not injected into the
+// build container. SKIP_ENV_VALIDATION=1 lets the build complete; validation
+// still runs at server startup where all variables must be present.
+if (!process.env.SKIP_ENV_VALIDATION) {
+  const parsed = schema.safeParse(process.env);
 
-if (!parsed.success) {
-  console.error(
-    "❌  Invalid environment variables:\n",
-    JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
-  );
-  throw new Error(
-    "Invalid environment variables — copy .env.example to .env.local and fill in values.",
-  );
+  if (!parsed.success) {
+    console.error(
+      "❌  Invalid environment variables:\n",
+      JSON.stringify(parsed.error.flatten().fieldErrors, null, 2),
+    );
+    throw new Error(
+      "Invalid environment variables — copy .env.example to .env.local and fill in values.",
+    );
+  }
 }
 
-export const env = parsed.data;
+export const env = schema.parse(process.env);
