@@ -16,41 +16,69 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import type { ActivationStatus } from "@prisma/client";
+import type { StatusTransitionDialogProps } from "@/types/activation";
+import {
+  PHRASE_GATES,
+  ALLOWED_TRANSITIONS,
+  TRANSITION_LABELS,
+} from "@/lib/activation/transitions";
 
-// Per §9.5 transition matrix.
-const PHRASE_GATES: Partial<Record<string, string>> = {
-  "SCHEDULED→DRAFT": "EDIT LOCKED ACTIVATION",
-  "LIVE→SCHEDULED": "ROLLBACK ENDED",
-  "ENDED→LIVE": "ROLLBACK ENDED",
-  "ENDED→SCHEDULED": "ROLLBACK ENDED",
-};
+type PendingAction =
+  | { type: "status"; to: ActivationStatus }
+  | { type: "submit_review" };
 
-const ALLOWED_TRANSITIONS: Record<ActivationStatus, ActivationStatus[]> = {
-  DRAFT: ["SCHEDULED"],
-  SCHEDULED: ["LIVE", "DRAFT"],
-  LIVE: ["ENDED", "SCHEDULED"],
-  ENDED: ["LIVE", "SCHEDULED"],
-};
+const SUBMITTABLE_REVIEW_STATES = ["DRAFT", "DRAFT_EDITED", "CHANGES_REQUESTED"] as const;
 
-const TRANSITION_LABELS: Record<string, string> = {
-  "DRAFT→SCHEDULED": "Schedule activation",
-  "SCHEDULED→LIVE": "Go LIVE",
-  "LIVE→ENDED": "End activation",
-  "SCHEDULED→DRAFT": "Revert to draft",
-  "LIVE→SCHEDULED": "Roll back to scheduled",
-  "ENDED→LIVE": "Roll back to LIVE",
-  "ENDED→SCHEDULED": "Roll back to scheduled",
-};
+function liveCtaLabel(startsAt: Date): string {
+  const ms = startsAt.getTime() - Date.now();
+  if (ms <= 0) return "Go LIVE now";
+  const m = Math.ceil(ms / 60_000);
+  return `Go LIVE in ${m}m`;
+}
 
-interface StatusTransitionDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  activationId: string;
-  currentStatus: ActivationStatus;
-  legalApproved: boolean;
-  startsAt: Date;
-  endsAt: Date;
-  onSuccess: (newStatus: ActivationStatus) => void;
+function countFilledParagraphs(doc: unknown): number {
+  if (!doc || typeof doc !== "object") return 0;
+  const { content } = doc as { content?: unknown[] };
+  if (!Array.isArray(content)) return 0;
+  return content.filter((node) => {
+    if (!node || typeof node !== "object") return false;
+    const n = node as { type?: string; content?: unknown[] };
+    if (n.type !== "paragraph" || !Array.isArray(n.content) || n.content.length === 0) return false;
+    return n.content.some((child) => {
+      const c = child as { type?: string; text?: string };
+      return c.type === "text" && typeof c.text === "string" && c.text.trim().length > 0;
+    });
+  }).length;
+}
+
+function PreflightRow({
+  pass,
+  blocking,
+  label,
+  sub,
+}: {
+  pass: boolean;
+  blocking: boolean;
+  label: string;
+  sub?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="mt-0.5 shrink-0">
+        {!blocking ? (
+          <DynamicIcon name="AlertCircle" className="h-4 w-4 text-amber-500" />
+        ) : pass ? (
+          <DynamicIcon name="CheckCircle2" className="h-4 w-4 text-[--ok]" />
+        ) : (
+          <DynamicIcon name="XCircle" className="h-4 w-4 text-destructive" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm leading-tight">{label}</p>
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      </div>
+    </div>
+  );
 }
 
 export function StatusTransitionDialog({
@@ -58,27 +86,38 @@ export function StatusTransitionDialog({
   onOpenChange,
   activationId,
   currentStatus,
-  legalApproved,
+  reviewStatus,
   startsAt,
   endsAt,
+  slug,
+  content,
+  consentNotice,
+  consentItems,
+  boothCount,
+  isCreator,
   onSuccess,
+  onReviewStatusChange,
 }: StatusTransitionDialogProps) {
-  const [selectedTo, setSelectedTo] = useState<ActivationStatus | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [phrase, setPhrase] = useState("");
   const [reason, setReason] = useState("");
+  const [slugInput, setSlugInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const selectedTo = pendingAction?.type === "status" ? pendingAction.to : null;
   const availableTargets = ALLOWED_TRANSITIONS[currentStatus];
-
   const transitionKey = selectedTo ? `${currentStatus}→${selectedTo}` : null;
   const requiredPhrase = transitionKey ? (PHRASE_GATES[transitionKey] ?? null) : null;
   const now = Date.now();
 
-  // Client-side gate checks mirroring the server.
+  const isReviewApproved = reviewStatus === "APPROVED";
+  const canSubmitForReview =
+    isCreator &&
+    (SUBMITTABLE_REVIEW_STATES as readonly string[]).includes(reviewStatus);
+
   function isTransitionAllowed(to: ActivationStatus): boolean {
-    const key = `${currentStatus}→${to}`;
-    if (key === "DRAFT→SCHEDULED" && !legalApproved) return false;
+    if (`${currentStatus}→${to}` === "DRAFT→SCHEDULED" && !isReviewApproved) return false;
     return true;
   }
 
@@ -95,46 +134,85 @@ export function StatusTransitionDialog({
   const phraseMatches = requiredPhrase ? phrase === requiredPhrase : true;
   const reasonOk = requiredPhrase ? reason.trim().length > 0 : true;
   const timeGated = selectedTo ? isTimeGated(selectedTo) : false;
+  const isGoingLive = currentStatus === "SCHEDULED" && selectedTo === "LIVE";
+
+  const contentOk = countFilledParagraphs(content) >= 1;
+  const hasConsentItems = Array.isArray(consentItems) && consentItems.length > 0;
+  const consentOk = hasConsentItems || countFilledParagraphs(consentNotice) >= 1;
+  const boothOk = boothCount >= 1;
+  const preflightOk = isReviewApproved && contentOk && consentOk && boothOk;
+  const slugOk = slugInput === slug;
 
   const canConfirm =
-    selectedTo !== null &&
-    isTransitionAllowed(selectedTo) &&
-    phraseMatches &&
-    reasonOk &&
-    !isLoading;
+    pendingAction !== null &&
+    !isLoading &&
+    (pendingAction.type === "submit_review"
+      ? true
+      : isTransitionAllowed(pendingAction.to) &&
+        phraseMatches &&
+        reasonOk &&
+        (!isGoingLive || (preflightOk && slugOk)));
 
   function handleClose() {
-    setSelectedTo(null);
+    setPendingAction(null);
     setPhrase("");
     setReason("");
+    setSlugInput("");
     setError(null);
     onOpenChange(false);
   }
 
+  function selectAction(action: PendingAction) {
+    setPendingAction(action);
+    setPhrase("");
+    setReason("");
+    setSlugInput("");
+    setError(null);
+  }
+
   async function handleConfirm() {
-    if (!selectedTo) return;
+    if (!pendingAction) return;
     setError(null);
     setIsLoading(true);
     try {
-      await trpc.activation.transitionStatus.mutate({
-        activationId,
-        to: selectedTo,
-        phrase: requiredPhrase ? phrase : undefined,
-        reason: requiredPhrase ? reason : undefined,
-        force: timeGated ? true : undefined,
-      });
-      handleClose();
-      onSuccess(selectedTo);
+      if (pendingAction.type === "submit_review") {
+        await trpc.activation.submitForReview.mutate({ activationId });
+        handleClose();
+        onReviewStatusChange?.("SUBMITTED");
+      } else {
+        await trpc.activation.transitionStatus.mutate({
+          activationId,
+          to: pendingAction.to,
+          phrase: requiredPhrase ? phrase : undefined,
+          reason: requiredPhrase ? reason : undefined,
+          force: timeGated ? true : undefined,
+        });
+        handleClose();
+        onSuccess(pendingAction.to);
+      }
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "Transition failed. Please try again.";
+          : "Action failed. Please try again.";
       setError(msg);
     } finally {
       setIsLoading(false);
     }
   }
+
+  const ctaLabel =
+    pendingAction?.type === "submit_review"
+      ? "Submit for review"
+      : isGoingLive
+      ? liveCtaLabel(startsAt)
+      : "Confirm";
+
+  const reviewStatusLabel: Record<string, string> = {
+    DRAFT: "Not yet submitted",
+    DRAFT_EDITED: "Edited since approval — re-review needed",
+    CHANGES_REQUESTED: "Changes were requested",
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -147,8 +225,37 @@ export function StatusTransitionDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-2">
+          {/* ── Review actions ─────────────────────────────────────── */}
+          {canSubmitForReview && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Review
+              </p>
+              <button
+                type="button"
+                onClick={() => selectAction({ type: "submit_review" })}
+                className={[
+                  "flex items-center justify-between rounded-md border px-3 py-2 text-sm text-left",
+                  pendingAction?.type === "submit_review"
+                    ? "border-primary bg-primary/10"
+                    : "hover:bg-muted/50",
+                ].join(" ")}
+              >
+                <span>Submit for review</span>
+                <span className="text-xs text-muted-foreground">
+                  {reviewStatusLabel[reviewStatus] ?? ""}
+                </span>
+              </button>
+            </div>
+          )}
+
+          {/* ── Status transitions ─────────────────────────────────── */}
           <div className="flex flex-col gap-2">
-            <Label>Transition to</Label>
+            {canSubmitForReview && (
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Status
+              </p>
+            )}
             <div className="flex flex-col gap-1.5">
               {availableTargets.map((to) => {
                 const key = `${currentStatus}→${to}`;
@@ -156,8 +263,10 @@ export function StatusTransitionDialog({
                 const gated = isTimeGated(to);
                 const label = TRANSITION_LABELS[key] ?? `→ ${to}`;
                 const disableReason =
-                  key === "DRAFT→SCHEDULED" && !legalApproved
-                    ? "Legal approval required"
+                  key === "DRAFT→SCHEDULED" && !isReviewApproved
+                    ? reviewStatus === "SUBMITTED"
+                      ? "Awaiting approval"
+                      : "Submit for review first"
                     : null;
 
                 return (
@@ -165,15 +274,10 @@ export function StatusTransitionDialog({
                     key={to}
                     type="button"
                     disabled={!allowed}
-                    onClick={() => {
-                      setSelectedTo(to);
-                      setPhrase("");
-                      setReason("");
-                      setError(null);
-                    }}
+                    onClick={() => selectAction({ type: "status", to })}
                     className={[
                       "flex items-center justify-between rounded-md border px-3 py-2 text-sm text-left",
-                      selectedTo === to
+                      pendingAction?.type === "status" && pendingAction.to === to
                         ? "border-primary bg-primary/10"
                         : "hover:bg-muted/50",
                       !allowed && "cursor-not-allowed opacity-50",
@@ -183,9 +287,7 @@ export function StatusTransitionDialog({
                   >
                     <span>{label}</span>
                     <span className="flex items-center gap-1.5">
-                      {gated && (
-                        <span className="text-xs text-amber-600">early — will force</span>
-                      )}
+                      {gated && <span className="text-xs text-amber-600">early — will force</span>}
                       {disableReason && (
                         <span className="text-xs text-destructive">{disableReason}</span>
                       )}
@@ -199,6 +301,79 @@ export function StatusTransitionDialog({
             </div>
           </div>
 
+          {/* ── Preflight checklist — SCHEDULED→LIVE only ─────────── */}
+          {isGoingLive && selectedTo === "LIVE" && (
+            <div className="flex flex-col gap-2 rounded-md border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Pre-flight checks
+              </p>
+              <div className="flex flex-col gap-2">
+                <PreflightRow
+                  pass={isReviewApproved}
+                  blocking
+                  label="Peer review approved"
+                  sub={
+                    isReviewApproved
+                      ? "Approved by a second admin"
+                      : reviewStatus === "SUBMITTED"
+                      ? "Under review — awaiting approval"
+                      : "Submit for peer review to proceed"
+                  }
+                />
+                <PreflightRow
+                  pass={contentOk}
+                  blocking
+                  label="Marketing copy"
+                  sub={
+                    contentOk
+                      ? "At least one paragraph"
+                      : "Add at least one paragraph in the Content tab"
+                  }
+                />
+                <PreflightRow
+                  pass={consentOk}
+                  blocking
+                  label="Consent"
+                  sub={
+                    consentOk
+                      ? hasConsentItems
+                        ? `${(consentItems as unknown[]).length} consent item${(consentItems as unknown[]).length !== 1 ? "s" : ""}`
+                        : "Consent notice added"
+                      : "Add at least one consent item or consent notice"
+                  }
+                />
+                <PreflightRow
+                  pass={boothOk}
+                  blocking
+                  label="At least one booth"
+                  sub={
+                    boothOk
+                      ? `${boothCount} booth${boothCount !== 1 ? "s" : ""} configured`
+                      : "Add a booth in the Booths tab"
+                  }
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Slug confirmation — SCHEDULED→LIVE only ───────────── */}
+          {isGoingLive && selectedTo === "LIVE" && (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="slugConfirm">
+                Type <code className="font-mono font-semibold">{slug}</code> to confirm
+              </Label>
+              <Input
+                id="slugConfirm"
+                value={slugInput}
+                onChange={(e) => setSlugInput(e.target.value)}
+                placeholder={slug}
+                autoComplete="off"
+                className={slugInput && !slugOk ? "border-destructive" : ""}
+              />
+            </div>
+          )}
+
+          {/* ── Phrase gate inputs ─────────────────────────────────── */}
           {selectedTo && requiredPhrase && (
             <>
               <div className="flex flex-col gap-2">
@@ -214,7 +389,6 @@ export function StatusTransitionDialog({
                   className={phrase && !phraseMatches ? "border-destructive" : ""}
                 />
               </div>
-
               <div className="flex flex-col gap-2">
                 <Label htmlFor="reason">Reason (required)</Label>
                 <Textarea
@@ -225,13 +399,16 @@ export function StatusTransitionDialog({
                   maxLength={500}
                   rows={3}
                 />
-                <p className="text-xs text-muted-foreground text-right">{reason.length}/500</p>
+                <p className="text-right text-xs text-muted-foreground">{reason.length}/500</p>
               </div>
             </>
           )}
 
           {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <p
+              className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              role="alert"
+            >
               {error}
             </p>
           )}
@@ -248,7 +425,7 @@ export function StatusTransitionDialog({
                 Confirming…
               </>
             ) : (
-              "Confirm"
+              ctaLabel
             )}
           </Button>
         </DialogFooter>

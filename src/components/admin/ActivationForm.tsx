@@ -3,53 +3,44 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
-import { TiptapEditor } from "@/components/admin/TiptapEditor";
 import { StatusTransitionDialog } from "@/components/admin/StatusTransitionDialog";
-import { CONTENT_ALLOWLIST, CONSENT_ALLOWLIST } from "@/lib/tiptap/allowlists";
-import { consentVersionOf } from "@/lib/tiptap/consentVersion";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { statusBadgeClass, reviewStatusBadge } from "@/lib/activationStatus";
+import type { ActivationReviewStatus, ActivationStatus } from "@prisma/client";
+import type {
+  ActivationFormProps,
+  ConsentItem,
+  BoothRow,
+  RegistrationFormState,
+  SuccessFormState,
+} from "@/types/activation";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
-import type { ActivationStatus, AdminRole } from "@prisma/client";
+import { ActivationFormBooths } from "./activation-form/ActivationFormBooths";
+import { ActivationFormBranding } from "./activation-form/ActivationFormBranding";
+import { ActivationFormUtm } from "./activation-form/ActivationFormUtm";
+import { ActivationFormReview } from "./activation-form/ActivationFormReview";
+import { ActivationFormSaveBar } from "./activation-form/ActivationFormSaveBar";
+import { ActivationPreview } from "./activation-form/ActivationPreview";
+import { ActivationRegistrationTab } from "./activation-form/ActivationRegistrationTab";
+import { ActivationSuccessTab } from "./activation-form/ActivationSuccessTab";
+import { SectionLabel, Rule } from "./activation-form/form-section";
+import { useTabUrlState } from "@/lib/admin/useTabUrlState";
+import { useUnsavedChangesGuard } from "@/lib/admin/useUnsavedChangesGuard";
+
+export type { ActivationFormProps };
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
-interface BoothRow {
-  id: string;
-  code: string;
-  label: string;
-}
-
-export interface ActivationFormProps {
-  mode: "create" | "edit";
-  userRole?: AdminRole;
-  initialData?: {
-    id: string;
-    name: string;
-    slug: string;
-    status: ActivationStatus;
-    startsAt: Date;
-    endsAt: Date;
-    content: unknown;
-    consentNotice: unknown;
-    consentVersion: string;
-    primaryColor: string | null;
-    heroImageUrl: string | null;
-    legalApproved: boolean;
-    booths: BoothRow[];
-  };
-}
-
-function statusVariant(status: ActivationStatus): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "LIVE") return "default";
-  if (status === "ENDED") return "destructive";
-  if (status === "SCHEDULED") return "secondary";
-  return "outline";
+function parseConsentItems(raw: unknown): ConsentItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === "object" && "text" in item)
+    .map((item, i) => ({
+      id: `init-${i}`,
+      text: String((item as { text: unknown }).text ?? ""),
+    }));
 }
 
 function toDatetimeLocal(d: Date): string {
@@ -57,79 +48,91 @@ function toDatetimeLocal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ActivationForm({ mode, userRole, initialData }: ActivationFormProps) {
-  const router = useRouter();
-  const isAdmin = userRole === "ADMIN";
+function autoSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
+export function ActivationForm({ mode, userRole, currentUserId, initialData, participantBaseUrl }: ActivationFormProps) {
+  const router = useRouter();
+  const { tab, preview, setTab, setPreview } = useTabUrlState();
+  const isAdmin = userRole === "ADMIN";
+  const isCreator = !!currentUserId && currentUserId === initialData?.createdById;
+
+  // ── Parent-level state (always-visible header + branding) ──────────
   const [name, setName] = useState(initialData?.name ?? "");
   const [slug, setSlug] = useState(initialData?.slug ?? "");
   const [startsAt, setStartsAt] = useState(
-    initialData ? toDatetimeLocal(new Date(initialData.startsAt)) : ""
+    initialData ? toDatetimeLocal(new Date(initialData.startsAt)) : "",
   );
   const [endsAt, setEndsAt] = useState(
-    initialData ? toDatetimeLocal(new Date(initialData.endsAt)) : ""
+    initialData ? toDatetimeLocal(new Date(initialData.endsAt)) : "",
   );
-  const [content, setContent] = useState<unknown>(initialData?.content ?? EMPTY_DOC);
-  const [consentNotice, setConsentNotice] = useState<unknown>(initialData?.consentNotice ?? EMPTY_DOC);
   const [primaryColor, setPrimaryColor] = useState(initialData?.primaryColor ?? "");
-  const [heroImageUrl, setHeroImageUrl] = useState(initialData?.heroImageUrl ?? "");
+  const [timezone, setTimezone] = useState(initialData?.timezone ?? "Europe/London");
+  const [entryCodePrefix, setEntryCodePrefix] = useState(initialData?.entryCodePrefix ?? "");
+  const [booths, setBooths] = useState<BoothRow[]>(initialData?.booths ?? []);
 
-  const savedConsentVersion = initialData?.consentVersion ?? "";
-  const currentConsentVersion = consentVersionOf(consentNotice);
-  const consentChanged = mode === "edit" && savedConsentVersion !== "" && currentConsentVersion !== savedConsentVersion;
+  // ── Registration tab state ─────────────────────────────────────────
+  const [registration, setRegistration] = useState<RegistrationFormState>({
+    content: initialData?.content ?? EMPTY_DOC,
+    consentNotice: initialData?.consentNotice ?? EMPTY_DOC,
+    consentItems: parseConsentItems(initialData?.consentItems),
+    ctaText: initialData?.ctaText ?? "",
+    termsContent: initialData?.termsContent ?? EMPTY_DOC,
+    heroImageUrl: initialData?.heroImageUrl ?? "",
+    heroImageAlt: initialData?.heroImageAlt ?? "",
+  });
 
-  // Optimistic local state for legalApproved (syncs from DB on page refresh).
-  const [legalApproved, setLegalApproved] = useState(initialData?.legalApproved ?? false);
-  const [legalNotes, setLegalNotes] = useState("");
-  const [isTogglingLegal, setIsTogglingLegal] = useState(false);
-  const [legalError, setLegalError] = useState<string | null>(null);
+  // ── Success tab state ──────────────────────────────────────────────
+  const [success, setSuccess] = useState<SuccessFormState>({
+    successHeading: initialData?.successHeading ?? "",
+    successSubheading: initialData?.successSubheading ?? "",
+    successContent: initialData?.successContent ?? EMPTY_DOC,
+    successCtaLabel: initialData?.successCtaLabel ?? "",
+    successCtaUrl: initialData?.successCtaUrl ?? "",
+    successShowEntryCode: initialData?.successShowEntryCode ?? true,
+    successShowResend: initialData?.successShowResend ?? true,
+    successSponsorName: initialData?.successSponsorName ?? "",
+    successSponsorLogoUrl: initialData?.successSponsorLogoUrl ?? "",
+    successSponsorLogoAlt: initialData?.successSponsorLogoAlt ?? "",
+    successSponsorHeadline: initialData?.successSponsorHeadline ?? "",
+    successSponsorBody: initialData?.successSponsorBody ?? "",
+    successSponsorCtaLabel: initialData?.successSponsorCtaLabel ?? "",
+    successSponsorCtaUrl: initialData?.successSponsorCtaUrl ?? "",
+  });
 
-  // Status transition dialog.
+  // ── Review state ───────────────────────────────────────────────────
+  const [reviewStatus, setReviewStatus] = useState<ActivationReviewStatus>(
+    initialData?.reviewStatus ?? "DRAFT",
+  );
+  const [submittedAt, setSubmittedAt] = useState<Date | null>(
+    initialData?.submittedAt ?? null,
+  );
+  const [approvedAt, setApprovedAt] = useState<Date | null>(
+    initialData?.approvedAt ?? null,
+  );
+  const [reviewNotes, setReviewNotes] = useState<string | null>(
+    initialData?.reviewNotes ?? null,
+  );
+
+  // ── Status transition state ────────────────────────────────────────
   const [transitionDialogOpen, setTransitionDialogOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<ActivationStatus>(
-    initialData?.status ?? "DRAFT"
+    initialData?.status ?? "DRAFT",
   );
 
-  const [booths, setBooths] = useState<BoothRow[]>(initialData?.booths ?? []);
-  const [newBoothCode, setNewBoothCode] = useState("");
-  const [newBoothLabel, setNewBoothLabel] = useState("");
-  const [boothError, setBoothError] = useState<string | null>(null);
-
+  // ── Save + dirty state ─────────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
 
-  const handleContentChange = useCallback((doc: unknown) => setContent(doc), []);
-  const handleConsentChange = useCallback((doc: unknown) => setConsentNotice(doc), []);
+  useUnsavedChangesGuard(isDirty && mode === "edit");
 
-  async function handleToggleLegal(approved: boolean) {
-    setLegalError(null);
-    setIsTogglingLegal(true);
-    try {
-      await trpc.activation.setLegalApproved.mutate({
-        activationId: initialData!.id,
-        approved,
-        notes: legalNotes || undefined,
-      });
-      setLegalApproved(approved);
-      if (!approved) setLegalNotes("");
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "Failed to update legal approval.";
-      setLegalError(msg);
-    } finally {
-      setIsTogglingLegal(false);
-    }
-  }
-
-  function autoSlug(value: string) {
-    return value
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-");
-  }
+  const markDirty = useCallback(() => setIsDirty(true), []);
 
   async function handleSave() {
     setSaveError(null);
@@ -140,17 +143,39 @@ export function ActivationForm({ mode, userRole, initialData }: ActivationFormPr
         slug,
         startsAt: new Date(startsAt),
         endsAt: new Date(endsAt),
-        content: content as Record<string, unknown>,
-        consentNotice: consentNotice as Record<string, unknown>,
+        content: registration.content as Record<string, unknown>,
+        consentNotice: registration.consentNotice as Record<string, unknown>,
+        consentItems: registration.consentItems.map(({ text }) => ({ text })),
+        ctaText: registration.ctaText.trim() || null,
+        termsContent: registration.termsContent as Record<string, unknown>,
         primaryColor: primaryColor || null,
-        heroImageUrl: heroImageUrl || null,
+        heroImageUrl: registration.heroImageUrl || null,
+        heroImageAlt: registration.heroImageAlt.trim() || null,
+        timezone,
+        entryCodePrefix: entryCodePrefix.trim().toUpperCase() || null,
+        // Success page fields
+        successHeading: success.successHeading.trim() || null,
+        successSubheading: success.successSubheading.trim() || null,
+        successContent: success.successContent as Record<string, unknown>,
+        successCtaLabel: success.successCtaLabel.trim() || null,
+        successCtaUrl: success.successCtaUrl.trim() || null,
+        successShowEntryCode: success.successShowEntryCode,
+        successShowResend: success.successShowResend,
+        // Sponsor block
+        successSponsorName: success.successSponsorName.trim() || null,
+        successSponsorLogoUrl: success.successSponsorLogoUrl || null,
+        successSponsorLogoAlt: success.successSponsorLogoAlt.trim() || null,
+        successSponsorHeadline: success.successSponsorHeadline.trim() || null,
+        successSponsorBody: success.successSponsorBody.trim() || null,
+        successSponsorCtaLabel: success.successSponsorCtaLabel.trim() || null,
+        successSponsorCtaUrl: success.successSponsorCtaUrl.trim() || null,
       };
-
       if (mode === "create") {
         const result = await trpc.activation.create.mutate(payload);
-        router.push(`/activations/${result.id}/edit`);
+        router.push(`/activations/${result.id}/edit?tab=success`);
       } else {
         await trpc.activation.update.mutate({ id: initialData!.id, data: payload });
+        setIsDirty(false);
         router.refresh();
       }
     } catch (err: unknown) {
@@ -164,339 +189,266 @@ export function ActivationForm({ mode, userRole, initialData }: ActivationFormPr
     }
   }
 
-  async function handleAddBooth() {
-    setBoothError(null);
-    const code = newBoothCode.trim().toUpperCase();
-    const label = newBoothLabel.trim();
-    if (!code || !label) {
-      setBoothError("Both code and label are required.");
-      return;
-    }
-    try {
-      const result = await trpc.booth.add.mutate({
-        activationId: initialData!.id,
-        code,
-        label,
-      });
-      setBooths((prev) => [...prev, { id: result.id, code, label }]);
-      setNewBoothCode("");
-      setNewBoothLabel("");
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "Failed to add booth.";
-      setBoothError(msg);
-    }
-  }
-
-  async function handleRemoveBooth(boothId: string) {
-    try {
-      await trpc.booth.remove.mutate({ boothId });
-      setBooths((prev) => prev.filter((b) => b.id !== boothId));
-    } catch {
-      // Keep in list on error — user can retry.
-    }
-  }
-
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">
-            {mode === "create" ? "New Activation" : name || "Edit Activation"}
-          </h1>
-          {initialData && (
-            <Badge variant={statusVariant(currentStatus)}>{currentStatus}</Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {initialData && isAdmin && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setTransitionDialogOpen(true)}
-            >
-              Change status
-            </Button>
-          )}
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <DynamicIcon name="Loader2" className="animate-spin" />
-                Saving…
-              </>
-            ) : (
-              "Save"
+    <div className="flex w-full items-start gap-8">
+      {/* ── Left: form pane ── */}
+      <div className="flex min-w-0 flex-1 flex-col gap-6 pb-12">
+        {/* Status badge + change status */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <Badge className={statusBadgeClass(currentStatus)}>{currentStatus}</Badge>
+            {(() => {
+              const rb = reviewStatusBadge(reviewStatus);
+              return rb ? (
+                <Badge className={rb.className}>{rb.label}</Badge>
+              ) : null;
+            })()}
+            {initialData && (isAdmin || isCreator) && (
+              <button
+                type="button"
+                onClick={() => setTransitionDialogOpen(true)}
+                className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2 transition-colors"
+              >
+                Change status
+              </button>
             )}
-          </Button>
+          </div>
         </div>
+
+        {/* Activation name */}
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (mode === "create") setSlug(autoSlug(e.target.value));
+            markDirty();
+          }}
+          placeholder={mode === "create" ? "New Activation" : "Activation name"}
+          className="placeholder:text-muted-foreground/40 hover:border-muted-foreground/20 focus:border-primary w-full border-b border-transparent bg-transparent pb-0.5 text-2xl font-semibold transition-colors outline-none"
+        />
+
+        {initialData && (
+          <StatusTransitionDialog
+            open={transitionDialogOpen}
+            onOpenChange={setTransitionDialogOpen}
+            activationId={initialData.id}
+            currentStatus={currentStatus}
+            reviewStatus={reviewStatus}
+            startsAt={new Date(initialData.startsAt)}
+            endsAt={new Date(initialData.endsAt)}
+            slug={slug}
+            content={registration.content}
+            consentNotice={registration.consentNotice}
+            consentItems={registration.consentItems}
+            boothCount={booths.length}
+            isCreator={currentUserId === initialData.createdById}
+            onSuccess={(newStatus) => {
+              setCurrentStatus(newStatus);
+              router.refresh();
+            }}
+            onReviewStatusChange={(newReviewStatus) => {
+              setReviewStatus(newReviewStatus);
+              router.refresh();
+            }}
+          />
+        )}
+
+        <Rule />
+
+        {/* Slug · Starts · Ends */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <SectionLabel>Slug</SectionLabel>
+            <div className="bg-background focus-within:ring-ring flex items-center overflow-hidden rounded-md border text-sm focus-within:ring-1">
+              <span className="bg-muted/50 text-muted-foreground border-r px-2 py-2 font-mono text-[11px] whitespace-nowrap select-none">
+                mrqlive.co.uk/
+              </span>
+              <input
+                type="text"
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                  markDirty();
+                }}
+                className="min-w-0 flex-1 bg-transparent px-2 py-2 font-mono text-xs outline-none"
+                placeholder="slug"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <SectionLabel>Starts</SectionLabel>
+            <Input
+              type="datetime-local"
+              value={startsAt}
+              onChange={(e) => { setStartsAt(e.target.value); markDirty(); }}
+              className="text-sm"
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <SectionLabel>Ends</SectionLabel>
+            <Input
+              type="datetime-local"
+              value={endsAt}
+              onChange={(e) => { setEndsAt(e.target.value); markDirty(); }}
+              className="text-sm"
+              required
+            />
+          </div>
+        </div>
+
+        {/* ── Tab selector ── */}
+        <div className="flex rounded-md border overflow-hidden text-sm font-medium">
+          {(["registration", "success"] as const).map((t) => {
+            const previewHref =
+              mode === "edit" && slug
+                ? `${participantBaseUrl}/${slug}${t === "success" ? "/success" : ""}?preview=true`
+                : null;
+            return (
+              <div
+                key={t}
+                className={cn(
+                  "flex flex-1 items-center justify-center transition-colors",
+                  tab === t ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className="flex-1 py-2"
+                >
+                  {t === "registration" ? "Registration page" : "Success page"}
+                </button>
+                {previewHref && (
+                  <a
+                    href={previewHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Preview ${t} page`}
+                    className={cn(
+                      "pr-3 opacity-60 hover:opacity-100 transition-opacity",
+                      tab === t ? "text-background" : "text-muted-foreground",
+                    )}
+                  >
+                    <DynamicIcon name="ExternalLink" className="h-3.5 w-3.5" />
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Tab content ── */}
+        {tab === "registration" ? (
+          <ActivationRegistrationTab
+            value={registration}
+            onChange={setRegistration}
+            onAnyChange={markDirty}
+          />
+        ) : (
+          <ActivationSuccessTab
+            value={success}
+            onChange={setSuccess}
+            onAnyChange={markDirty}
+            activationId={initialData?.id}
+            mode={mode}
+          />
+        )}
+
+        <Rule />
+
+        <ActivationFormBranding
+          primaryColor={primaryColor}
+          timezone={timezone}
+          entryCodePrefix={entryCodePrefix}
+          onPrimaryColorChange={(v) => { setPrimaryColor(v); markDirty(); }}
+          onTimezoneChange={(v) => { setTimezone(v); markDirty(); }}
+          onEntryCodePrefixChange={(v) => { setEntryCodePrefix(v); markDirty(); }}
+        />
+
+        <Rule />
+
+        <ActivationFormUtm slug={slug} activationId={initialData?.id} participantBaseUrl={participantBaseUrl} />
+
+        <ActivationFormBooths
+          mode={mode}
+          activationId={initialData?.id}
+          booths={booths}
+          onBoothsChange={setBooths}
+        />
+
+        {mode === "edit" && (
+          <>
+            <Rule />
+            <ActivationFormReview
+              mode={mode}
+              isAdmin={isAdmin}
+              isCreator={isCreator}
+              activationId={initialData!.id}
+              reviewStatus={reviewStatus}
+              submittedAt={submittedAt}
+              approvedAt={approvedAt}
+              reviewNotes={reviewNotes}
+              currentStatus={currentStatus}
+              consentVersion={initialData!.consentVersion}
+              name={name}
+              slug={slug}
+              heroImageUrl={registration.heroImageUrl}
+              content={registration.content}
+              consentNotice={registration.consentNotice}
+              consentItems={registration.consentItems}
+              ctaText={registration.ctaText}
+              termsContent={registration.termsContent}
+              primaryColor={primaryColor}
+              onReviewChange={(updates) => {
+                setReviewStatus(updates.reviewStatus);
+                if ("submittedAt" in updates) setSubmittedAt(updates.submittedAt ?? null);
+                if ("approvedAt" in updates) setApprovedAt(updates.approvedAt ?? null);
+                if ("reviewNotes" in updates) setReviewNotes(updates.reviewNotes ?? null);
+              }}
+              onOpenTransitionDialog={() => setTransitionDialogOpen(true)}
+            />
+          </>
+        )}
+
+        <ActivationFormSaveBar
+          mode={mode}
+          isSaving={isSaving}
+          saveError={saveError}
+          reviewStatus={reviewStatus}
+          currentStatus={currentStatus}
+          name={name}
+          onSave={handleSave}
+          onCancel={() => router.back()}
+        />
       </div>
 
-      {saveError && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-          {saveError}
-        </p>
-      )}
-
-      {!legalApproved && mode === "edit" && (
-        <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-          Legal approval required before this activation can be scheduled.
-        </p>
-      )}
-
-      {initialData && (
-        <StatusTransitionDialog
-          open={transitionDialogOpen}
-          onOpenChange={setTransitionDialogOpen}
-          activationId={initialData.id}
-          currentStatus={currentStatus}
-          legalApproved={legalApproved}
-          startsAt={new Date(initialData.startsAt)}
-          endsAt={new Date(initialData.endsAt)}
-          onSuccess={(newStatus) => {
-            setCurrentStatus(newStatus);
-            router.refresh();
-          }}
-        />
-      )}
-
-      <Tabs defaultValue="header">
-        <TabsList>
-          <TabsTrigger value="header">Header</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="consent">
-            Consent
-            {consentChanged && (
-              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" aria-label="changed" />
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="booths" disabled={mode === "create"}>
-            Booths
-          </TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-        </TabsList>
-
-        {/* ── Header ── */}
-        <TabsContent value="header" className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                if (mode === "create") setSlug(autoSlug(e.target.value));
-              }}
-              placeholder="Summer 2026 Activation"
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="slug">Slug</Label>
-            <Input
-              id="slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-              placeholder="summer-2026"
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Used in the participant URL: <code>/{slug || "…"}</code>
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="startsAt">Starts at</Label>
-              <Input
-                id="startsAt"
-                type="datetime-local"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="endsAt">Ends at</Label>
-              <Input
-                id="endsAt"
-                type="datetime-local"
-                value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Legal approval — ADMIN only, edit mode only */}
-          {mode === "edit" && isAdmin && (
-            <div className="flex flex-col gap-3 rounded-md border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Legal approval</p>
-                  <p className="text-xs text-muted-foreground">
-                    Required before this activation can be scheduled.
-                  </p>
-                </div>
-                <Switch
-                  checked={legalApproved}
-                  onCheckedChange={handleToggleLegal}
-                  disabled={isTogglingLegal}
-                  aria-label="Toggle legal approval"
-                />
-              </div>
-              {!legalApproved && (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="legalNotes" className="text-xs">Approval notes (optional)</Label>
-                  <Textarea
-                    id="legalNotes"
-                    value={legalNotes}
-                    onChange={(e) => setLegalNotes(e.target.value)}
-                    placeholder="Add notes for the record…"
-                    rows={2}
-                    maxLength={500}
-                    className="text-sm"
-                  />
-                </div>
-              )}
-              {legalError && (
-                <p className="text-xs text-destructive" role="alert">{legalError}</p>
-              )}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* ── Content ── */}
-        <TabsContent value="content" className="mt-4">
-          <div className="flex flex-col gap-2">
-            <Label>Landing page content</Label>
-            <TiptapEditor
-              content={content}
-              onChange={handleContentChange}
-              allowlist={CONTENT_ALLOWLIST}
-            />
-          </div>
-        </TabsContent>
-
-        {/* ── Consent ── */}
-        <TabsContent value="consent" className="mt-4 flex flex-col gap-3">
-          {consentChanged && (
-            <div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-              Consent notice changed — re-approval required before this activation can be scheduled.
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            <Label>Consent notice</Label>
-            <TiptapEditor
-              content={consentNotice}
-              onChange={handleConsentChange}
-              allowlist={CONSENT_ALLOWLIST}
-            />
-          </div>
-        </TabsContent>
-
-        {/* ── Booths ── */}
-        <TabsContent value="booths" className="mt-4 flex flex-col gap-4">
-          {mode === "create" ? (
-            <p className="text-sm text-muted-foreground">Save the activation first to manage booths.</p>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2">
-                {booths.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No booths yet.</p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {booths.map((b) => (
-                      <li key={b.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                        <span className="text-sm">
-                          <span className="font-mono font-medium">{b.code}</span>
-                          <span className="ml-2 text-muted-foreground">{b.label}</span>
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveBooth(b.id)}
-                          aria-label={`Remove booth ${b.code}`}
-                        >
-                          <DynamicIcon name="Trash2" className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3 rounded-md border p-4">
-                <p className="text-sm font-medium">Add booth</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="boothCode" className="text-xs">Code (uppercase)</Label>
-                    <Input
-                      id="boothCode"
-                      value={newBoothCode}
-                      onChange={(e) => setNewBoothCode(e.target.value.toUpperCase())}
-                      placeholder="BOOTH-A"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="boothLabel" className="text-xs">Label</Label>
-                    <Input
-                      id="boothLabel"
-                      value={newBoothLabel}
-                      onChange={(e) => setNewBoothLabel(e.target.value)}
-                      placeholder="Booth A"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                </div>
-                {boothError && (
-                  <p className="text-xs text-destructive" role="alert">{boothError}</p>
-                )}
-                <Button type="button" size="sm" onClick={handleAddBooth} className="w-fit">
-                  Add booth
-                </Button>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* ── Branding ── */}
-        <TabsContent value="branding" className="mt-4 flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="heroImageUrl">Hero image URL</Label>
-            <Input
-              id="heroImageUrl"
-              type="url"
-              value={heroImageUrl}
-              onChange={(e) => setHeroImageUrl(e.target.value)}
-              placeholder="https://cdn.example.com/hero.jpg"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="primaryColor">Primary colour</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="primaryColor"
-                value={primaryColor}
-                onChange={(e) => setPrimaryColor(e.target.value)}
-                placeholder="#FF3366"
-                className="max-w-[140px] font-mono"
-                maxLength={7}
-              />
-              {primaryColor.match(/^#[0-9a-fA-F]{6}$/) && (
-                <span
-                  className="h-7 w-7 rounded-md border"
-                  style={{ backgroundColor: primaryColor }}
-                />
-              )}
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+      {/* ── Right: live preview ── */}
+      <ActivationPreview
+        preview={preview}
+        onPreviewChange={setPreview}
+        name={name}
+        slug={slug}
+        primaryColor={primaryColor}
+        heroImageUrl={registration.heroImageUrl}
+        content={registration.content}
+        consentNotice={registration.consentNotice}
+        consentItems={registration.consentItems}
+        ctaText={registration.ctaText}
+        termsContent={registration.termsContent}
+        successHeading={success.successHeading}
+        successSubheading={success.successSubheading}
+        successContent={success.successContent}
+        successCtaLabel={success.successCtaLabel}
+        successShowEntryCode={success.successShowEntryCode}
+        successShowResend={success.successShowResend}
+        successSponsorLogoUrl={success.successSponsorLogoUrl}
+        successSponsorHeadline={success.successSponsorHeadline}
+        successSponsorBody={success.successSponsorBody}
+        successSponsorCtaLabel={success.successSponsorCtaLabel}
+      />
     </div>
   );
 }

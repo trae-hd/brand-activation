@@ -1,6 +1,7 @@
 "use client";
 
 import { SidebarProvider, SidebarInset } from "../../ui/sidebar";
+import { TooltipProvider } from "../../ui/tooltip";
 import { AppSidebar } from "../app-sidebar";
 import { SiteHeader } from "../site-header";
 import type React from "react";
@@ -32,6 +33,7 @@ export function PagesLayout({
   user,
 }: PagesLayoutProps) {
   return (
+    <TooltipProvider>
     <div className="[--header-height:3.5rem]">
       <SidebarProvider className="flex flex-col">
         <SiteHeader appName={appName} user={user} />
@@ -51,5 +53,6 @@ export function PagesLayout({
         </div>
       </SidebarProvider>
     </div>
+    </TooltipProvider>
   );
 }

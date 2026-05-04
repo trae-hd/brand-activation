@@ -1,12 +1,14 @@
 "use client";
 import { trpcReact } from "@/lib/trpc/react";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   activationId: string;
   boothCode: string;
+  label?: string;
 }
 
-export function BoothQrButton({ activationId, boothCode }: Props) {
+export function BoothQrButton({ activationId, boothCode, label = "Download QR" }: Props) {
   const utils = trpcReact.useUtils();
 
   const onClick = async () => {
@@ -30,8 +32,8 @@ export function BoothQrButton({ activationId, boothCode }: Props) {
   };
 
   return (
-    <button type="button" onClick={onClick} className="text-sm underline">
-      Download QR
-    </button>
+    <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={onClick}>
+      {label}
+    </Button>
   );
 }

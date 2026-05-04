@@ -7,13 +7,13 @@ import { fixedWindow } from "@/lib/rateLimit/fixedWindow";
 import { hmac } from "@/lib/crypto/hmac";
 import { verifyPendingToken } from "@/lib/otp/pendingToken";
 import { consumeOtp, incrementAttempts } from "@/lib/otp/verify";
+import { generateEntryCodeSuffix } from "@/lib/compliance/constants";
 
 const Body = z.object({
   pendingToken: z.string().min(1),
   otp: z.string().regex(/^\d{6}$/),
 });
 
-const OK = NextResponse.json({ ok: true }, { status: 200 });
 const FAIL = NextResponse.json({ ok: false }, { status: 400 });
 
 export async function POST(req: Request) {
@@ -59,10 +59,49 @@ export async function POST(req: Request) {
     }
 
     await consumeOtp(decoded.registrationId, { peek: false });
-    await prisma.registration.update({
+
+    // Fetch activation prefix to determine if an entry code should be generated.
+    const reg = await prisma.registration.findUnique({
       where: { id: decoded.registrationId },
-      data: { status: "VERIFIED", verifiedAt: new Date() },
+      select: { activationId: true },
     });
-    return OK;
+    const activation = reg
+      ? await prisma.activation.findUnique({
+          where: { id: reg.activationId },
+          select: { entryCodePrefix: true },
+        })
+      : null;
+
+    let entryCode: string | null = null;
+
+    if (activation?.entryCodePrefix) {
+      const prefix = activation.entryCodePrefix;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const candidate = `${prefix}-${generateEntryCodeSuffix()}`;
+        try {
+          await prisma.registration.update({
+            where: { id: decoded.registrationId },
+            data: { status: "VERIFIED", verifiedAt: new Date(), entryCode: candidate },
+          });
+          entryCode = candidate;
+          break;
+        } catch {
+          if (attempt === 2) {
+            // Give up on code generation — still mark verified without a code.
+            await prisma.registration.update({
+              where: { id: decoded.registrationId },
+              data: { status: "VERIFIED", verifiedAt: new Date() },
+            });
+          }
+        }
+      }
+    } else {
+      await prisma.registration.update({
+        where: { id: decoded.registrationId },
+        data: { status: "VERIFIED", verifiedAt: new Date() },
+      });
+    }
+
+    return NextResponse.json({ ok: true, ...(entryCode ? { entryCode } : {}) });
   });
 }

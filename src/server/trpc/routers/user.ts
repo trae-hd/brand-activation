@@ -4,12 +4,25 @@ import { router, publicProcedure } from "../init";
 import { memberProcedure, adminProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { mintRawToken, hashToken } from "@/lib/auth/tokens";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import { emailProvider } from "@/lib/email/provider";
 import { env } from "@/lib/env";
 import type { AdminRole } from "@prisma/client";
 
-interface AdminUserItem {
+async function requireMinAdminCount(excludeUserId: string): Promise<void> {
+  const count = await prisma.adminUser.count({
+    where: { role: "ADMIN", active: true, id: { not: excludeUserId } },
+  });
+  if (count === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Cannot perform this action — at least one active ADMIN must remain.",
+    });
+  }
+}
+
+interface AdminUserBase {
   id: string;
   email: string;
   name: string;
@@ -19,8 +32,103 @@ interface AdminUserItem {
   lastLoginAt: Date | null;
 }
 
+interface AdminUserItem extends AdminUserBase {
+  hasPendingInvite: boolean;
+}
+
 export const userRouter = router({
-  me: memberProcedure.query(async ({ ctx }): Promise<AdminUserItem> => {
+  updateProfile: memberProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100).optional(),
+        email: z
+          .string()
+          .email()
+          .transform((s) => s.toLowerCase())
+          .refine(
+            (e) => e.endsWith(`@${env.ALLOWED_EMAIL_DOMAIN.toLowerCase()}`),
+            { message: `Email must be a @${env.ALLOWED_EMAIL_DOMAIN} address.` }
+          )
+          .optional(),
+        currentPassword: z.string().optional(),
+        newPassword: z.string().min(12).max(256).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }): Promise<{ ok: true }> => {
+      const actorId = ctx.session.user.adminUserId!;
+      const user = await prisma.adminUser.findUniqueOrThrow({
+        where: { id: actorId },
+        select: { id: true, email: true, name: true, passwordHash: true },
+      });
+
+      const updates: Record<string, unknown> = {};
+      const auditPromises: Promise<void>[] = [];
+
+      if (input.name !== undefined && input.name !== user.name) {
+        updates.name = input.name;
+        auditPromises.push(
+          writeAuditLog({
+            category: "ADMIN",
+            action: "user.profile.name_changed",
+            actorId,
+            targetType: "AdminUser",
+            targetId: actorId,
+            metadata: {},
+          })
+        );
+      }
+
+      if (input.email !== undefined && input.email !== user.email) {
+        const existing = await prisma.adminUser.findUnique({ where: { email: input.email } });
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account with that email already exists." });
+        }
+        updates.email = input.email;
+        auditPromises.push(
+          writeAuditLog({
+            category: "SECURITY",
+            action: "user.profile.email_changed",
+            actorId,
+            targetType: "AdminUser",
+            targetId: actorId,
+            metadata: {},
+          })
+        );
+      }
+
+      if (input.currentPassword !== undefined && input.newPassword !== undefined) {
+        if (!user.passwordHash) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No password is set on this account. Sign in via Google SSO.",
+          });
+        }
+        const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+        if (!valid) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Current password is incorrect." });
+        }
+        updates.passwordHash = await hashPassword(input.newPassword);
+        auditPromises.push(
+          writeAuditLog({
+            category: "SECURITY",
+            action: "user.password.changed",
+            actorId,
+            targetType: "AdminUser",
+            targetId: actorId,
+            metadata: {},
+          })
+        );
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await prisma.adminUser.update({ where: { id: actorId }, data: updates });
+        await Promise.all(auditPromises);
+      }
+
+      return { ok: true };
+    }),
+
+  me: memberProcedure.query(async ({ ctx }): Promise<AdminUserBase> => {
     const user = await prisma.adminUser.findUniqueOrThrow({
       where: { id: ctx.session.user.adminUserId! },
       select: { id: true, email: true, name: true, role: true, active: true, createdAt: true, lastLoginAt: true },
@@ -29,10 +137,20 @@ export const userRouter = router({
   }),
 
   list: adminProcedure.query(async (): Promise<AdminUserItem[]> => {
-    return prisma.adminUser.findMany({
-      select: { id: true, email: true, name: true, role: true, active: true, createdAt: true, lastLoginAt: true },
-      orderBy: { createdAt: "asc" },
-    });
+    const now = new Date();
+    const [users, invites] = await Promise.all([
+      prisma.adminUser.findMany({
+        where: { active: true },
+        select: { id: true, email: true, name: true, role: true, active: true, createdAt: true, lastLoginAt: true },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.adminInvite.findMany({
+        where: { consumedAt: null, expiresAt: { gt: now } },
+        select: { subjectId: true },
+      }),
+    ]);
+    const pendingSet = new Set(invites.map((i) => i.subjectId));
+    return users.map((u) => ({ ...u, hasPendingInvite: pendingSet.has(u.id) }));
   }),
 
   invite: adminProcedure
@@ -103,6 +221,8 @@ export const userRouter = router({
         name: input.name,
         setPasswordUrl,
         issuerName: actor.name,
+        workspaceName: "MrQ Live",
+        role: input.role,
       });
 
       if (!sendResult.ok) {
@@ -136,6 +256,13 @@ export const userRouter = router({
       if (input.userId === actorId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot deactivate your own account." });
       }
+      const targetForDeactivate = await prisma.adminUser.findUniqueOrThrow({
+        where: { id: input.userId },
+        select: { role: true },
+      });
+      if (targetForDeactivate.role === "ADMIN") {
+        await requireMinAdminCount(input.userId);
+      }
       await prisma.$transaction(async (tx) => {
         const target = await tx.adminUser.findUniqueOrThrow({
           where: { id: input.userId },
@@ -152,6 +279,61 @@ export const userRouter = router({
           targetType: "AdminUser",
           targetId: input.userId,
           metadata: { reason: input.reason },
+          tx,
+        });
+      });
+      return { ok: true };
+    }),
+
+  changeRole: adminProcedure
+    .input(z.object({ userId: z.string().min(1), role: z.enum(["ADMIN", "MEMBER"]) }))
+    .mutation(async ({ input, ctx }): Promise<{ ok: true }> => {
+      const actorId = ctx.session.user.adminUserId!;
+      if (input.userId === actorId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot change your own role." });
+      }
+      const target = await prisma.adminUser.findUniqueOrThrow({
+        where: { id: input.userId },
+        select: { id: true, role: true, active: true },
+      });
+      if (!target.active) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot change role of a deactivated user." });
+      }
+      if (target.role === "ADMIN" && input.role === "MEMBER") {
+        await requireMinAdminCount(input.userId);
+      }
+      await prisma.$transaction(async (tx) => {
+        await tx.adminUser.update({ where: { id: input.userId }, data: { role: input.role } });
+        await writeAuditLog({
+          category: "ADMIN",
+          action: "user.role.changed",
+          actorId,
+          targetType: "AdminUser",
+          targetId: input.userId,
+          metadata: { from: target.role, to: input.role },
+          tx,
+        });
+      });
+      return { ok: true };
+    }),
+
+  cancelInvite: adminProcedure
+    .input(z.object({ userId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }): Promise<{ ok: true }> => {
+      const actorId = ctx.session.user.adminUserId!;
+      await prisma.$transaction(async (tx) => {
+        await tx.adminInvite.updateMany({
+          where: { subjectId: input.userId, consumedAt: null },
+          data: { consumedAt: new Date() },
+        });
+        await tx.adminUser.update({ where: { id: input.userId }, data: { active: false } });
+        await writeAuditLog({
+          category: "ADMIN",
+          action: "user.invite.cancelled",
+          actorId,
+          targetType: "AdminUser",
+          targetId: input.userId,
+          metadata: {},
           tx,
         });
       });

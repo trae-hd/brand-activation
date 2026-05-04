@@ -15,8 +15,8 @@ interface Args {
   ipHash?: string | null;
   /**
    * Optional transaction client. Pass when the audit row must commit
-   * atomically with surrounding writes — status transitions, legalApproved
-   * toggles, user deactivations. Omit for stand-alone events.
+   * atomically with surrounding writes — status transitions, review state
+   * changes, user deactivations. Omit for stand-alone events.
    */
   tx?: Prisma.TransactionClient;
 }

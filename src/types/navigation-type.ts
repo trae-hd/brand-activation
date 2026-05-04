@@ -1,5 +1,8 @@
 import { IconName } from "../config/IconMapping";
 
+/** Keys that map to a live badge count fetched in the sidebar. */
+export type BadgeCountKey = "pendingReview" | "liveCount";
+
 /** A single navigation item, optionally with children for sub-menus. */
 export interface NavItem {
   /** Unique identifier for this nav item */
@@ -16,4 +19,8 @@ export interface NavItem {
   children?: NavItem[];
   /** Optional badge text rendered next to the label (e.g. "Beta", "New"). */
   badge?: string;
+  /** If set, a live numeric badge is rendered from the matching BadgeCountContext entry. */
+  badgeQueryKey?: BadgeCountKey;
+  /** Optional colour variant for the numeric badge. Defaults to "blue". */
+  badgeVariant?: "blue" | "green" | "amber";
 }

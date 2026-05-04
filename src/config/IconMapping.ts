@@ -1,5 +1,9 @@
 import {
   Activity,
+  ArrowRight,
+  MoreHorizontal,
+  Sparkles,
+  KeyRound,
   Monitor,
   ClipboardList,
   FileCheck,
@@ -26,6 +30,7 @@ import {
   Rocket,
   Clock,
   Archive,
+  ArchiveRestore,
   FileUser,
   FolderUp,
   Gamepad2,
@@ -100,6 +105,7 @@ import {
   Upload,
   Flag,
   Save,
+  GitBranch,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -111,6 +117,10 @@ function createIconMap<K extends string>(
 
 export const icons = createIconMap({
   Activity,
+  ArrowRight,
+  MoreHorizontal,
+  Sparkles,
+  KeyRound,
   Monitor,
   ClipboardList,
   FileCheck,
@@ -137,6 +147,7 @@ export const icons = createIconMap({
   Rocket,
   Clock,
   Archive,
+  ArchiveRestore,
   FileUser,
   FolderUp,
   Gamepad2,
@@ -211,6 +222,7 @@ export const icons = createIconMap({
   Upload,
   Flag,
   Save,
+  GitBranch,
 });
 
 /** Union of all valid icon names in the registry. */

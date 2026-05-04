@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
@@ -7,7 +8,13 @@ import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 
 const PAGE = 500;
 
-export async function GET(req: Request) {
+const Body = z.object({
+  email: z.string().email().transform((s) => s.toLowerCase()),
+  requestRef: z.string().min(1),
+});
+
+// POST — email travels in the request body, never in the URL (PII compliance).
+export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (
     !session?.user?.adminUserId ||
@@ -17,15 +24,13 @@ export async function GET(req: Request) {
     return new NextResponse(null, { status: 401 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const rawEmail = searchParams.get("email");
-  const requestRef = searchParams.get("requestRef");
-
-  if (!rawEmail || !requestRef) {
+  const body = await req.json().catch(() => null);
+  const parsed = Body.safeParse(body);
+  if (!parsed.success) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const email = rawEmail.toLowerCase();
+  const { email, requestRef } = parsed.data;
   const emailHash = hmac.email(email);
   const actorId = session.user.adminUserId;
   const safeRef = requestRef.replace(/[^A-Za-z0-9_\-]/g, "_");
@@ -35,7 +40,7 @@ export async function GET(req: Request) {
       const encoder = new TextEncoder();
       controller.enqueue(
         encoder.encode(
-          "id,email,activationName,activationSlug,status,boothCode,utmSource,utmMedium,utmCampaign,consentVersion,consentAcceptedAt,registeredAt,verifiedAt\n"
+          "id,activationName,activationSlug,status,boothCode,utmSource,utmMedium,utmCampaign,consentVersion,consentAcceptedAt,registeredAt,verifiedAt\n"
         )
       );
 
@@ -51,7 +56,6 @@ export async function GET(req: Request) {
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
             select: {
               id: true,
-              email: true,
               status: true,
               boothCode: true,
               utmSource: true,
@@ -72,7 +76,6 @@ export async function GET(req: Request) {
               encoder.encode(
                 csvRow([
                   r.id,
-                  r.email,
                   r.activation.name,
                   r.activation.slug,
                   r.status,

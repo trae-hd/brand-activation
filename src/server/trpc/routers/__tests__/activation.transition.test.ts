@@ -2,7 +2,7 @@
  * Phase 4B atomicity test — §9.5 transition matrix + transaction rollback.
  *
  * These tests use mocked Prisma. They verify:
- *   1. Gate enforcement (legalApproved, typed phrases, invalid transitions).
+ *   1. Gate enforcement (reviewStatus, typed phrases, invalid transitions).
  *   2. That transitionStatus calls prisma.$transaction so the status update
  *      and audit row are coupled — if the inner writeAuditLog throws, the
  *      status update is not committed (Prisma rolls back the transaction).
@@ -38,8 +38,6 @@ vi.mock("@/lib/db/prisma", () => ({
 const mockWriteAuditLog = vi.fn();
 
 vi.mock("@/lib/audit/writeAuditLog", () => ({
-  // Forward the call to our spy, then delegate to tx.auditLog.create so the
-  // atomicity test can inject a tx that throws.
   writeAuditLog: async (args: {
     tx?: { auditLog: { create: (d: unknown) => Promise<unknown> } };
     action: string;
@@ -60,7 +58,6 @@ vi.mock("@/lib/audit/writeAuditLog", () => ({
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-// Build a mock tRPC context for an ADMIN session.
 function makeAdminCtx() {
   return {
     session: {
@@ -78,7 +75,6 @@ function makeAdminCtx() {
   };
 }
 
-// Build the tRPC caller by importing the router directly.
 async function makeTransitionCaller() {
   const { activationRouter } = await import("../activation");
   return activationRouter.createCaller(makeAdminCtx());
@@ -111,7 +107,7 @@ describe("activation.transitionStatus — gate enforcement", () => {
 
   it("throws BAD_REQUEST for an illegal transition (DRAFT → ENDED)", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), legalApproved: false,
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "DRAFT",
     });
     const caller = await makeTransitionCaller();
     await expect(
@@ -119,9 +115,9 @@ describe("activation.transitionStatus — gate enforcement", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("throws BAD_REQUEST for DRAFT → SCHEDULED when legalApproved is false", async () => {
+  it("throws BAD_REQUEST for DRAFT → SCHEDULED when reviewStatus is not APPROVED", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), legalApproved: false,
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "DRAFT",
     });
     const caller = await makeTransitionCaller();
     await expect(
@@ -129,9 +125,29 @@ describe("activation.transitionStatus — gate enforcement", () => {
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("allows DRAFT → SCHEDULED when legalApproved is true", async () => {
+  it("also blocks DRAFT → SCHEDULED when reviewStatus is SUBMITTED (not yet approved)", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "SUBMITTED",
+    });
+    const caller = await makeTransitionCaller();
+    await expect(
+      caller.transitionStatus({ activationId: "act-1", to: "SCHEDULED" })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("also blocks DRAFT → SCHEDULED when reviewStatus is DRAFT_EDITED", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "DRAFT_EDITED",
+    });
+    const caller = await makeTransitionCaller();
+    await expect(
+      caller.transitionStatus({ activationId: "act-1", to: "SCHEDULED" })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("allows DRAFT → SCHEDULED when reviewStatus is APPROVED", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
@@ -151,7 +167,7 @@ describe("activation.transitionStatus — gate enforcement", () => {
 
   it("throws BAD_REQUEST for SCHEDULED → DRAFT without the correct phrase", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     const caller = await makeTransitionCaller();
     await expect(
@@ -161,7 +177,7 @@ describe("activation.transitionStatus — gate enforcement", () => {
 
   it("throws BAD_REQUEST for SCHEDULED → DRAFT without a reason", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     const caller = await makeTransitionCaller();
     await expect(
@@ -176,7 +192,7 @@ describe("activation.transitionStatus — gate enforcement", () => {
 
   it("allows SCHEDULED → DRAFT with correct phrase and reason", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "SCHEDULED", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
@@ -198,7 +214,7 @@ describe("activation.transitionStatus — gate enforcement", () => {
 
   it("rejects ENDED → LIVE without phrase ROLLBACK ENDED", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "ENDED", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "ENDED", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     const caller = await makeTransitionCaller();
     await expect(
@@ -216,40 +232,32 @@ describe("activation.transitionStatus — atomicity (§9.5)", () => {
 
   it("rolls back the status update when writeAuditLog throws inside the transaction", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
 
-    // Simulate a $transaction that executes the callback but whose auditLog.create throws.
     mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {
         activation: { update: mockActivationUpdate.mockResolvedValueOnce({}) },
-        // auditLog.create throws — simulating a DB error mid-transaction.
         auditLog: {
           create: vi.fn().mockRejectedValueOnce(new Error("simulated-audit-db-failure")),
         },
       };
-      // Call the callback — it will throw when auditLog.create is hit.
-      // $transaction re-throws (Prisma rolls back the DB state).
       return fn(tx);
     });
 
     const caller = await makeTransitionCaller();
 
-    // The procedure must propagate the error.
     await expect(
       caller.transitionStatus({ activationId: "act-1", to: "SCHEDULED" })
     ).rejects.toThrow("simulated-audit-db-failure");
 
-    // The transaction was attempted (activation.update was called) but threw.
-    // In production Postgres, both the status update and audit row are absent.
-    // Here we verify the mock threw before the transaction could commit.
     expect(mockTransaction).toHaveBeenCalledTimes(1);
     expect(mockActivationUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("writes exactly one audit row per successful transition", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
-      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), legalApproved: true,
+      id: "act-1", status: "DRAFT", startsAt: new Date(), endsAt: new Date(), reviewStatus: "APPROVED",
     });
     mockTransaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) => {
       const tx = {

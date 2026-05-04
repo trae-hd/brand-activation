@@ -4,6 +4,7 @@ import { adminProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { hmac } from "@/lib/crypto/hmac";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
+import { ERASURE_REQUIRED_PHRASE } from "@/lib/compliance/constants";
 
 const emailSchema = z.string().email().transform((s) => s.toLowerCase());
 
@@ -51,7 +52,7 @@ export const complianceRouter = router({
         z.object({
           email: emailSchema,
           requestRef: z.string().min(1),
-          typedPhrase: z.literal("ERASE PARTICIPANT DATA"),
+          typedPhrase: z.literal(ERASURE_REQUIRED_PHRASE),
           reason: z.string().min(1),
         })
       )
@@ -79,6 +80,12 @@ export const complianceRouter = router({
           });
 
           await tx.registration.deleteMany({ where: { email: input.email } });
+
+          await tx.emailSuppression.upsert({
+            where: { emailHash },
+            update: {},
+            create: { emailHash, reason: `erasure:${input.requestRef}` },
+          });
 
           return { rowCount: count };
         });

@@ -9,6 +9,8 @@ export interface EmailProvider {
     name: string;
     setPasswordUrl: string;
     issuerName: string;
+    workspaceName: string;
+    role: "ADMIN" | "MEMBER";
   }): Promise<{ ok: true } | { ok: false; reason: string }>;
   sendPasswordReset(args: {
     to: string;

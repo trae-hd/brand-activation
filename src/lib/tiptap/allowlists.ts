@@ -1,5 +1,5 @@
 export const CONTENT_ALLOWLIST = {
-  nodes: ["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem", "horizontalRule", "image"],
+  nodes: ["doc", "text", "paragraph", "heading", "bulletList", "orderedList", "listItem", "horizontalRule", "image"],
   marks: ["bold", "italic", "underline", "link"],
   attrs: {
     heading: { level: [1, 2, 3] },
@@ -9,7 +9,7 @@ export const CONTENT_ALLOWLIST = {
 } as const;
 
 export const CONSENT_ALLOWLIST = {
-  nodes: ["doc", "paragraph", "heading", "bulletList", "orderedList", "listItem"],
+  nodes: ["doc", "text", "paragraph", "heading", "bulletList", "orderedList", "listItem"],
   marks: ["bold", "italic", "link"],
   attrs: {
     heading: { level: [2, 3] },

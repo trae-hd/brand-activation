@@ -1,16 +1,18 @@
 import { requireRole } from "@/lib/auth/requireRole";
+import { AdminShell } from "@/components/shared/layouts/AdminShell";
+import { AccessDenied } from "@/components/shared/AccessDenied";
 import { ErasureClient } from "./ErasureClient";
 
 export default async function ErasurePage() {
-  await requireRole("ADMIN");
+  const session = await requireRole("ANY");
+  const isAdmin = session.user.role === "ADMIN";
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-6">
-      <div>
+    <AdminShell>
+      <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Right to Erasure</h1>
-        <p className="mt-1 text-xs text-muted-foreground">ADMIN only</p>
+        {isAdmin ? <ErasureClient /> : <AccessDenied />}
       </div>
-      <ErasureClient />
-    </main>
+    </AdminShell>
   );
 }

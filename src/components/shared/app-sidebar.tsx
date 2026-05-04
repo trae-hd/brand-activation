@@ -36,7 +36,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <Sidebar {...props}>
-      <SidebarContent>
+      <SidebarContent className="pt-[var(--header-height)]">
         <SidebarNav
           mainNavigationMenuItems={mainNavItems}
           secondaryNavigationMenuItems={secondaryNavItems}

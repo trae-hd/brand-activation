@@ -98,11 +98,20 @@ export const authOptions: NextAuthOptions = {
       if (profile?.email && profile.email.split("@")[1] !== env.GOOGLE_WORKSPACE_DOMAIN) {
         return false;
       }
+      const lowerEmail = email!.toLowerCase();
       const admin = await prisma.adminUser.findUnique({
-        where: { email: email!.toLowerCase() },
+        where: { email: lowerEmail },
         select: { id: true, active: true },
       });
-      return Boolean(admin && admin.active);
+      if (admin) return admin.active;
+      // First-time Google sign-in from an allowed domain → auto-provision as MEMBER
+      const name =
+        (profile as Record<string, string> | undefined)?.name ??
+        lowerEmail.split("@")[0];
+      await prisma.adminUser.create({
+        data: { email: lowerEmail, name, role: "MEMBER", active: true },
+      });
+      return true;
     },
 
     async jwt({ token, profile, user }) {

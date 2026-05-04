@@ -6,6 +6,8 @@ import { auditRouter } from "./routers/audit";
 import { userRouter } from "./routers/user";
 import { authRouter } from "./routers/auth";
 import { complianceRouter } from "./routers/compliance";
+import { settingsRouter } from "./routers/settings";
+import { feedbackRouter } from "./routers/feedback";
 
 export const appRouter = router({
   activation: activationRouter,
@@ -15,6 +17,8 @@ export const appRouter = router({
   user: userRouter,
   auth: authRouter,
   compliance: complianceRouter,
+  settings: settingsRouter,
+  feedback: feedbackRouter,
 });
 
 export type AppRouter = typeof appRouter;

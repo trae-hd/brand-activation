@@ -5,7 +5,6 @@ import { adminProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import { renderBoothQrPng } from "@/lib/qr/render";
-import { env } from "@/lib/env";
 
 const BoothCodeSchema = z
   .string()
@@ -165,7 +164,6 @@ export const boothRouter = router({
       if (!booth) throw new TRPCError({ code: "NOT_FOUND" });
 
       const png = await renderBoothQrPng({
-        baseUrl: env.PUBLIC_BASE_URL,
         activationSlug: booth.activation.slug,
         boothCode: booth.code,
       });

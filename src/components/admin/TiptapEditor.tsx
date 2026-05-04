@@ -51,6 +51,7 @@ export function TiptapEditor({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     content: content as any,
     editable: !disabled,
+    immediatelyRender: false,
     onUpdate({ editor }) {
       onChange(editor.getJSON());
     },
@@ -67,6 +68,7 @@ export function TiptapEditor({
             variant={editor.isActive("bold") ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleBold().run()}
           >
             B
@@ -76,6 +78,7 @@ export function TiptapEditor({
             variant={editor.isActive("italic") ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs italic"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleItalic().run()}
           >
             I
@@ -86,6 +89,7 @@ export function TiptapEditor({
               variant={editor.isActive("underline") ? "secondary" : "ghost"}
               size="sm"
               className="h-7 px-2 text-xs underline"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().toggleUnderline().run()}
             >
               U
@@ -96,6 +100,7 @@ export function TiptapEditor({
             variant={editor.isActive("heading", { level: 2 }) ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
           >
             H2
@@ -105,6 +110,7 @@ export function TiptapEditor({
             variant={editor.isActive("heading", { level: 3 }) ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
           >
             H3
@@ -114,6 +120,7 @@ export function TiptapEditor({
             variant={editor.isActive("bulletList") ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           >
             •—
@@ -123,6 +130,7 @@ export function TiptapEditor({
             variant={editor.isActive("orderedList") ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
           >
             1—
@@ -133,9 +141,22 @@ export function TiptapEditor({
         editor={editor}
         className={cn(
           "min-h-[160px] rounded-md border bg-background px-3 py-2 text-sm",
-          "prose prose-sm max-w-none",
+          // Tiptap content area
           "[&_.tiptap]:outline-none [&_.tiptap]:min-h-[140px]",
-          disabled && "opacity-60 cursor-not-allowed"
+          // Headings
+          "[&_.tiptap_h2]:mb-0.5 [&_.tiptap_h2]:mt-2 [&_.tiptap_h2]:text-base [&_.tiptap_h2]:font-semibold",
+          "[&_.tiptap_h3]:mb-0.5 [&_.tiptap_h3]:mt-1.5 [&_.tiptap_h3]:text-sm [&_.tiptap_h3]:font-semibold",
+          // Paragraphs
+          "[&_.tiptap_p]:my-0.5 [&_.tiptap_p]:leading-relaxed",
+          // Lists — Tailwind resets list-style globally so we must opt back in
+          "[&_.tiptap_ul]:my-1 [&_.tiptap_ul]:list-disc [&_.tiptap_ul]:pl-5",
+          "[&_.tiptap_ol]:my-1 [&_.tiptap_ol]:list-decimal [&_.tiptap_ol]:pl-5",
+          "[&_.tiptap_li]:my-0.5 [&_.tiptap_li]:leading-snug",
+          // Inline marks
+          "[&_.tiptap_strong]:font-semibold",
+          "[&_.tiptap_em]:italic",
+          "[&_.tiptap_u]:underline",
+          disabled && "opacity-60 cursor-not-allowed",
         )}
       />
     </div>

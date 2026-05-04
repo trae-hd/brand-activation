@@ -14,6 +14,14 @@ enum ActivationStatus {
   ENDED
 }
 
+enum ActivationReviewStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  DRAFT_EDITED
+}
+
 enum AdminRole {
   ADMIN
   MEMBER
@@ -30,6 +38,34 @@ enum AuditCategory {
   SECURITY
 }
 
+enum MrqAccountStatus {
+  UNKNOWN
+  ACTIVE
+  INACTIVE
+  NOT_FOUND
+}
+
+model WorkspaceSettings {
+  id                  String     @id @default("workspace")
+  workspaceName       String     @default("MrQ Live")
+  timezone            String     @default("Europe/London")
+  otpTtlMin           Int        @default(10)
+  geofence            String?
+  dataRetentionDays   Int        @default(180)
+  require2fa          Boolean    @default(false)
+  sessionTimeoutHours Int        @default(8)
+  updatedAt           DateTime   @updatedAt
+  updatedBy           AdminUser? @relation(fields: [updatedById], references: [id])
+  updatedById         String?
+}
+
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  emailHash String   @unique
+  reason    String
+  createdAt DateTime @default(now())
+}
+
 model Activation {
   id        String           @id @default(cuid())
   slug      String           @unique
@@ -39,23 +75,56 @@ model Activation {
   startsAt DateTime
   endsAt   DateTime
 
+  timezone        String  @default("Europe/London")
+  archivedAt      DateTime?
+  entryCodePrefix String?
+
   /// Tiptap ProseMirror tree for the landing page (loose allowlist — see §9.2).
   content Json
   /// Tiptap ProseMirror tree for the consent / privacy notice (tight allowlist — see §9.2).
   consentNotice Json
   /// SHA-256 of the canonicalised consentNotice JSON. Recomputed on every save.
   consentVersion String
+  /// Tiptap ProseMirror tree for the T&Cs accordion shown at the bottom of the participant form.
+  termsContent Json?
+  /// JSON array of consent checkbox items: [{text: string}]. Shown as individual checkboxes on the registration form.
+  consentItems Json?
+  /// Optional CTA button label for the registration form (e.g. "Send me a code").
+  ctaText String?
 
   /// Optional hex colour for the landing page primary accent (e.g. "#FF3366").
   primaryColor String?
   /// Optional URL of a hero image for the landing page.
   heroImageUrl String?
+  heroImageAlt String?
 
-  legalApproved      Boolean   @default(false)
-  legalApprovedAt    DateTime?
-  legalApprovedBy    AdminUser? @relation("LegalApprover", fields: [legalApprovedById], references: [id])
-  legalApprovedById  String?
-  legalApprovalNotes String?
+  // ── Success page fields ──
+  successHeading        String?
+  successSubheading     String?
+  successContent        Json?
+  successCtaLabel       String?
+  successCtaUrl         String?
+  successShowEntryCode  Boolean @default(true)
+  successShowResend     Boolean @default(true)
+
+  // ── Sponsor block (shown at bottom of success page; omitted when all null) ──
+  successSponsorName     String?
+  successSponsorLogoUrl  String?
+  successSponsorLogoAlt  String?
+  successSponsorHeadline String?
+  successSponsorBody     String?
+  successSponsorCtaLabel String?
+  successSponsorCtaUrl   String?
+
+  // ── Peer review fields ──
+  reviewStatus  ActivationReviewStatus @default(DRAFT)
+  submittedAt   DateTime?
+  submittedBy   AdminUser?             @relation("ReviewSubmitter", fields: [submittedById], references: [id])
+  submittedById String?
+  approvedAt    DateTime?
+  approvedBy    AdminUser?             @relation("ReviewApprover", fields: [approvedById], references: [id])
+  approvedById  String?
+  reviewNotes   String?
 
   createdAt   DateTime  @default(now())
   createdBy   AdminUser @relation("ActivationCreator", fields: [createdById], references: [id])
@@ -67,6 +136,7 @@ model Activation {
 
   @@index([status, startsAt])
   @@index([slug])
+  @@index([reviewStatus, createdById])
 }
 
 model Booth {
@@ -103,10 +173,23 @@ model Registration {
   consentVersion    String
   consentAcceptedAt DateTime
 
+  /// Generated at OTP verification if the activation has an entryCodePrefix.
+  entryCode String?
+
   registeredAt DateTime  @default(now())
   verifiedAt   DateTime?
 
+  /// Result of silent MRQ account cross-check. Only populated for VERIFIED registrations with consent.
+  mrqAccountStatus MrqAccountStatus @default(UNKNOWN)
+  /// Date the participant registered their MRQ account. Null until enrichment runs.
+  mrqRegisteredAt  DateTime?
+  /// Last login timestamp returned by the MRQ account API. Null until enrichment runs.
+  mrqLastLoginAt   DateTime?
+  /// When the MRQ enrichment check was last executed for this registration.
+  mrqEnrichedAt    DateTime?
+
   @@unique([activationId, emailHash])
+  @@unique([activationId, entryCode])
   @@index([activationId, status])
   @@index([registeredAt])
   @@index([emailHash])
@@ -142,13 +225,15 @@ model AdminUser {
   createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
 
-  activationsCreated       Activation[]        @relation("ActivationCreator")
-  activationsLegalApproved Activation[]        @relation("LegalApprover")
-  auditLogsAuthored        AuditLog[]          @relation("AuditActor")
+  activationsCreated          Activation[]         @relation("ActivationCreator")
+  activationsReviewSubmitted  Activation[]         @relation("ReviewSubmitter")
+  activationsReviewApproved   Activation[]         @relation("ReviewApprover")
+  auditLogsAuthored           AuditLog[]           @relation("AuditActor")
   invitesIssued            AdminInvite[]       @relation("InviteIssuer")
   invitesReceived          AdminInvite[]       @relation("InviteSubject")
   passwordResetsIssued     PasswordResetToken[] @relation("ResetIssuer")
   passwordResetsReceived   PasswordResetToken[] @relation("ResetSubject")
+  workspaceSettingsUpdated WorkspaceSettings[]
 
   @@index([role, active])
 }

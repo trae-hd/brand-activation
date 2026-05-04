@@ -3,6 +3,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ConsentBlock } from "./ConsentBlock";
 
+interface ConsentItemData {
+  text: string;
+}
+
 interface Props {
   activationId: string;
   activationSlug: string;
@@ -12,6 +16,16 @@ interface Props {
   utmCampaign: string | null;
   consentNotice: unknown;
   consentVersion: string;
+  consentItems?: unknown;
+  ctaText: string | null;
+}
+
+function parseItems(raw: unknown): ConsentItemData[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === "object" && "text" in item)
+    .map((item) => ({ text: String((item as { text: unknown }).text ?? "") }))
+    .filter((item) => item.text.trim().length > 0);
 }
 
 export function RegistrationForm(props: Props) {
@@ -20,6 +34,14 @@ export function RegistrationForm(props: Props) {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const items = parseItems(props.consentItems);
+  const ctaLabel = props.ctaText?.trim() || "Send me a code";
+
+  // For multi-item consent, track each checkbox independently.
+  const [itemChecks, setItemChecks] = useState<boolean[]>(() => items.map(() => false));
+  const allConsentsChecked =
+    items.length > 0 ? itemChecks.every(Boolean) : consentAccepted;
 
   const submit = () => {
     setError(null);
@@ -52,6 +74,9 @@ export function RegistrationForm(props: Props) {
         }
         const { pendingToken } = (await res.json()) as { pendingToken: string };
         sessionStorage.setItem(`mrq:pendingToken:${props.activationSlug}`, pendingToken);
+        sessionStorage.setItem(`mrq:email:${props.activationSlug}`, email);
+        sessionStorage.setItem(`mrq:activationId:${props.activationSlug}`, props.activationId);
+        sessionStorage.setItem(`mrq:consentVersion:${props.activationSlug}`, props.consentVersion);
         router.push(`/${props.activationSlug}/verify`);
       } catch {
         setError("Network error. Please try again.");
@@ -60,31 +85,80 @@ export function RegistrationForm(props: Props) {
   };
 
   return (
-    <div className="mt-6 space-y-4">
-      <label className="block">
-        <span className="text-sm font-medium">Email</span>
+    <div className="space-y-4">
+      <div>
+        <label
+          htmlFor="reg-email"
+          className="mb-1 block text-xs font-medium text-ink-3"
+        >
+          Email
+        </label>
         <input
+          id="reg-email"
           type="email"
           inputMode="email"
           autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-border px-3 py-2"
+          className="block w-full rounded-md border border-border px-3 py-2 text-sm"
         />
-      </label>
+      </div>
 
-      <ConsentBlock notice={props.consentNotice} accepted={consentAccepted} onAccept={setConsentAccepted} />
+      {/* Consent: dynamic items or fallback single checkbox */}
+      {items.length > 0 ? (
+        <div className="space-y-2">
+          {items.map((item, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <input
+                id={`reg-consent-${i}`}
+                type="checkbox"
+                checked={itemChecks[i] ?? false}
+                onChange={(e) =>
+                  setItemChecks((prev) => {
+                    const next = [...prev];
+                    next[i] = e.target.checked;
+                    return next;
+                  })
+                }
+                required
+                className="mt-0.5 shrink-0"
+              />
+              <label
+                htmlFor={`reg-consent-${i}`}
+                className="text-sm leading-snug"
+              >
+                {item.text}
+              </label>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-start gap-2">
+          <input
+            id="reg-consent"
+            type="checkbox"
+            checked={consentAccepted}
+            onChange={(e) => setConsentAccepted(e.target.checked)}
+            required
+            className="mt-0.5 shrink-0"
+          />
+          <label htmlFor="reg-consent" className="text-sm leading-snug">
+            I&apos;m 18+ and accept the{" "}
+            <ConsentBlock notice={props.consentNotice} />
+          </label>
+        </div>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <button
         type="button"
-        disabled={!email || !consentAccepted || isPending}
+        disabled={!email || !allConsentsChecked || isPending}
         onClick={submit}
-        className="w-full rounded-md bg-primary px-4 py-3 text-primary-foreground disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
       >
-        {isPending ? "Sending code…" : "Send me a code"}
+        {isPending ? "Sending code…" : ctaLabel}
       </button>
     </div>
   );

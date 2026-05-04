@@ -11,8 +11,8 @@ export const devProvider: EmailProvider = {
     console.log(`[devProvider] OTP for ${to}: ${otp}`);
     return { ok: true };
   },
-  async sendInvite({ to }) {
-    console.log(`[devProvider] invite email to ${to} (no-op)`);
+  async sendInvite({ to, name, role }) {
+    console.log(`[devProvider] invite email to ${to} — ${name} (${role}) (no-op)`);
     return { ok: true };
   },
   async sendPasswordReset({ to }) {

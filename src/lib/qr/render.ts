@@ -1,15 +1,17 @@
 import QRCode from "qrcode";
+import { getActivationUrl } from "@/lib/url/activationUrl";
 
-export async function renderBoothQrPng(opts: {
-  baseUrl: string;
-  activationSlug: string;
-  boothCode: string;
-}): Promise<Buffer> {
-  const url = new URL(`/${opts.activationSlug}`, opts.baseUrl);
-  url.searchParams.set("booth", opts.boothCode);
-  return QRCode.toBuffer(url.toString(), {
+export async function renderQrPng(url: string): Promise<Buffer> {
+  return QRCode.toBuffer(url, {
     width: 1024,
     margin: 2,
     errorCorrectionLevel: "Q",
   });
+}
+
+export async function renderBoothQrPng(opts: {
+  activationSlug: string;
+  boothCode: string;
+}): Promise<Buffer> {
+  return renderQrPng(getActivationUrl(opts.activationSlug, { boothCode: opts.boothCode }));
 }
