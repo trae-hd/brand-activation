@@ -14,9 +14,6 @@
     "email": "email dev --dir ./src/lib/email/templates --port 3001",
     "postinstall": "prisma generate"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@react-email/components": "^1.0.12",
