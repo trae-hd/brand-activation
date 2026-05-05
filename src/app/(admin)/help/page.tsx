@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth/requireRole";
 import { AdminShell } from "@/components/shared/layouts/AdminShell";
+import { HelpRequestForm } from "./HelpRequestForm";
 
 const ARTICLES = [
   { category: "Getting started", count: 8, headline: "Build your first activation in 5 min" },
@@ -52,23 +53,15 @@ export default async function HelpPage() {
           </div>
         </div>
 
-        {/* Email support */}
-        <div className="rounded-md border p-4">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl" aria-hidden="true">✉</span>
-            <div className="flex-1">
-              <p className="text-sm font-semibold">Email support</p>
-              <p className="text-xs text-muted-foreground">
-                live-support@mrq.com · reply within 1 business day
-              </p>
-            </div>
-            <a
-              href="mailto:live-support@mrq.com"
-              className="inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90 transition-opacity"
-            >
-              Compose →
-            </a>
+        {/* Help request — raises a Linear ticket with the MarOps team */}
+        <div className="rounded-md border p-5 space-y-4">
+          <div>
+            <p className="text-sm font-semibold">Raise a help request</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Creates a Linear ticket directly with the MarOps team. You&apos;ll get a link to track progress.
+            </p>
           </div>
+          <HelpRequestForm />
         </div>
       </div>
     </AdminShell>

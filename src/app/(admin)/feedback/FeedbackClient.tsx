@@ -35,7 +35,7 @@ export function FeedbackClient() {
 
   const canSend = subject.trim().length > 0 && body.trim().length > 0 && severity !== null;
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!canSend || submit.isPending || !severity) return;
     submit.mutate({ type, subject, body, severity, attachContext });
@@ -53,8 +53,8 @@ export function FeedbackClient() {
 
   if (submit.isSuccess) {
     return (
-      <div className="max-w-xl space-y-4">
-        <div className="rounded-md border p-6 text-center space-y-2">
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="w-full max-w-md rounded-md border p-6 text-center space-y-2">
           <p className="text-2xl">🙏</p>
           <p className="font-semibold">Thanks — feedback received.</p>
           <p className="text-sm text-muted-foreground">
@@ -194,7 +194,7 @@ export function FeedbackClient() {
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
           <p className="text-xs text-muted-foreground">
-            Posts to <span className="underline">#mrq-live-feedback</span> · auto-creates Linear ticket if SEV ≥ 4
+            Creates a Linear ticket with the team.
           </p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={handleReset}>

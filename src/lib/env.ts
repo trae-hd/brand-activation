@@ -41,7 +41,7 @@ const schema = z.object({
   // Bootstrap (optional — only needed for seeding the first admin)
   BOOTSTRAP_ADMIN_EMAIL: z.string().email().optional(),
 
-  // Linear integration (optional — feedback tickets skipped if absent)
+  // Linear integration (optional — tickets skipped if absent)
   LINEAR_API_KEY: z.string().min(1).optional(),
   LINEAR_TEAM_ID: z.string().min(1).optional(),
 

@@ -144,6 +144,7 @@ export default async function SuccessPage({
         showEntryCode={showEntryCode}
         showResend={showResend}
         primaryColor={activation.primaryColor}
+        isPreview={isPreview}
       />
 
       {/* Sponsor / promo block */}

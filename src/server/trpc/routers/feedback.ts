@@ -52,7 +52,7 @@ export const feedbackRouter = router({
       let issueUrl: string | null = null;
 
       if (env.LINEAR_API_KEY && env.LINEAR_TEAM_ID) {
-        const title = `[MrQ Live · ${input.type}] ${input.subject}`;
+        const title = `Activation Feedback Request - ${input.subject}`;
         const description = buildDescription(
           input.type,
           input.body,

@@ -9,6 +9,7 @@ interface Props {
   showEntryCode: boolean;
   showResend: boolean;
   primaryColor: string | null;
+  isPreview?: boolean;
 }
 
 export function SuccessSessionData({
@@ -18,6 +19,7 @@ export function SuccessSessionData({
   showEntryCode,
   showResend,
   primaryColor,
+  isPreview = false,
 }: Props) {
   const [session] = useState<{
     activationId: string | null;
@@ -25,6 +27,9 @@ export function SuccessSessionData({
     consentVersion: string | null;
     entryCode: string | null;
   }>(() => {
+    if (isPreview) {
+      return { activationId: "preview", email: "you@example.com", consentVersion: "preview", entryCode: "PREVIEW-CODE" };
+    }
     if (typeof window === "undefined") {
       return { activationId: null, email: null, consentVersion: null, entryCode: null };
     }

@@ -287,7 +287,11 @@ export function ActivationListClient({ activations, userRole: _userRole }: Props
                     </td>
                     <td className="px-4 py-3 font-mono text-muted-foreground">{a.slug}</td>
                     <td className="px-4 py-3">
-                      <Badge className={statusBadgeClass(a.status)}>{a.status}</Badge>
+                      {isArchived ? (
+                        <Badge className="border-border bg-muted/60 text-muted-foreground">ARCHIVED</Badge>
+                      ) : (
+                        <Badge className={statusBadgeClass(a.status)}>{a.status}</Badge>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{a.boothCount}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">

@@ -88,13 +88,7 @@ export const navMain: NavItem[] = [
         href: "/methodology",
         icon: "GitBranch",
       },
-      {
-        id: "help-faqs",
-        label: "Help & FAQs",
-        title: "Help & FAQs",
-        href: "/help",
-        icon: "HelpCircle",
-      },
+
     ],
   },
 ];

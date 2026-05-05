@@ -1,4 +1,5 @@
 "use client";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 interface Props {
@@ -16,7 +17,7 @@ export function OtpInput({ value, onChange, disabled }: Props) {
       disabled={disabled}
       autoComplete="one-time-code"
       inputMode="numeric"
-      pattern="\d{6}"
+      pattern={REGEXP_ONLY_DIGITS}
     >
       <InputOTPGroup>
         <InputOTPSlot index={0} />

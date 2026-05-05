@@ -771,10 +771,11 @@ export const activationRouter = router({
         select: { id: true },
       });
       if (!activation) throw new TRPCError({ code: "NOT_FOUND" });
+      const archivedAt = new Date();
       await prisma.$transaction(async (tx) => {
         await tx.activation.update({
           where: { id: input.activationId },
-          data: { archivedAt: new Date() },
+          data: { archivedAt, endsAt: archivedAt },
         });
         await writeAuditLog({
           category: "ADMIN",
@@ -846,7 +847,7 @@ export const activationRouter = router({
     }),
 
   countLive: memberProcedure.query(async () => {
-    return prisma.activation.count({ where: { status: "LIVE" } });
+    return prisma.activation.count({ where: { status: "LIVE", archivedAt: null } });
   }),
 
   getCampaignQrPng: adminProcedure
