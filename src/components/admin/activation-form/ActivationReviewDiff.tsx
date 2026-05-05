@@ -21,6 +21,7 @@ interface Props {
   // Current (pending) state
   name: string;
   slug: string;
+  participantHost: string;
   heroImageUrl: string;
   content: unknown;
   consentNotice: unknown;
@@ -39,6 +40,7 @@ export function ActivationReviewDiff({
   consentVersionApproved,
   name,
   slug,
+  participantHost,
   heroImageUrl,
   content,
   consentNotice,
@@ -76,6 +78,7 @@ export function ActivationReviewDiff({
               mode="readonly-diff"
               name={snapshotName}
               slug={snapshotSlug}
+              participantHost={participantHost}
               heroImageUrl={snapshotHeroImageUrl}
               content={snapshotContent}
               consentNotice={snapshotConsentNotice}
@@ -95,6 +98,7 @@ export function ActivationReviewDiff({
               mode="readonly-diff"
               name={name}
               slug={slug}
+              participantHost={participantHost}
               heroImageUrl={heroImageUrl}
               content={content}
               consentNotice={consentNotice}

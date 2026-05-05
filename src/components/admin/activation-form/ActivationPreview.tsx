@@ -52,6 +52,8 @@ interface Props {
   // Registration preview fields
   name: string;
   slug: string;
+  /** Display-only host (e.g. "live.hqmops.com") shown in the preview URL strip. */
+  participantHost: string;
   heroImageUrl: string;
   content: unknown;
   consentNotice: unknown;
@@ -82,6 +84,7 @@ interface Props {
 export function ActivationPreview({
   name,
   slug,
+  participantHost,
   heroImageUrl,
   content,
   consentNotice,
@@ -186,6 +189,7 @@ export function ActivationPreview({
         <DesktopPreview
           name={name}
           slug={slug}
+          participantHost={participantHost}
           heroImageUrl={heroImageUrl}
           previewBody={previewBody}
           consentNotice={consentNotice}
@@ -301,11 +305,13 @@ function MobilePreview({
 
 interface DesktopPreviewProps extends PreviewBodyProps {
   slug: string;
+  participantHost: string;
 }
 
 function DesktopPreview({
   name,
   slug,
+  participantHost,
   heroImageUrl,
   previewBody,
   consentNotice,
@@ -328,7 +334,7 @@ function DesktopPreview({
           <span className="h-2.5 w-2.5 rounded-full bg-green-400/60" />
         </div>
         <div className="bg-muted/60 text-muted-foreground flex-1 truncate overflow-hidden rounded px-2 py-0.5 font-mono text-[10px]">
-          mrqlive.co.uk/{slug || "…"}
+          {participantHost}/{slug || "…"}
         </div>
       </div>
       <div className="flex flex-col gap-2.5 p-4">

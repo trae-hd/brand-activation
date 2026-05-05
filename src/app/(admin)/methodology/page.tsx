@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/shared/layouts/AdminShell";
+import { env } from "@/lib/env";
 import type { ReactNode } from "react";
 
 // ── Inline primitives ─────────────────────────────────────────────────────────
@@ -364,7 +365,7 @@ export default function MethodologyPage() {
             <SubSection title="QR codes">
               <p>
                 Each booth has a &ldquo;QR ↓&rdquo; button that downloads a 1024×1024 PNG QR code.
-                The encoded URL is <code>https://mrqlive.co.uk/[slug]?booth=CODE</code>.
+                The encoded URL is <code>{env.PUBLIC_BASE_URL}/[slug]?booth=CODE</code>.
               </p>
               <p>
                 Use &ldquo;Download all QRs (zip)&rdquo; to download all booth QRs for the

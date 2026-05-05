@@ -32,6 +32,7 @@ interface Props {
   // Current form state — passed to the diff viewer
   name: string;
   slug: string;
+  participantHost: string;
   heroImageUrl: string;
   content: unknown;
   consentNotice: unknown;
@@ -72,6 +73,7 @@ export function ActivationFormReview({
   consentVersion,
   name,
   slug,
+  participantHost,
   heroImageUrl,
   content,
   consentNotice,
@@ -223,6 +225,7 @@ export function ActivationFormReview({
               consentVersionApproved={consentVersionApproved}
               name={name}
               slug={slug}
+              participantHost={participantHost}
               heroImageUrl={heroImageUrl}
               content={content}
               consentNotice={consentNotice}

@@ -61,6 +61,9 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
   const { tab, preview, setTab, setPreview } = useTabUrlState();
   const isAdmin = userRole === "ADMIN";
   const isCreator = !!currentUserId && currentUserId === initialData?.createdById;
+  // Display-only host (e.g. "live.hqmops.com") — derived from the env-driven
+  // base URL so labels track whichever domain the deployment is serving.
+  const participantHost = new URL(participantBaseUrl).host;
 
   // ── Parent-level state (always-visible header + branding) ──────────
   const [name, setName] = useState(initialData?.name ?? "");
@@ -262,7 +265,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
             <SectionLabel>Slug</SectionLabel>
             <div className="bg-background focus-within:ring-ring flex items-center overflow-hidden rounded-md border text-sm focus-within:ring-1">
               <span className="bg-muted/50 text-muted-foreground border-r px-2 py-2 font-mono text-[11px] whitespace-nowrap select-none">
-                mrqlive.co.uk/
+                {participantHost}/
               </span>
               <input
                 type="text"
@@ -395,6 +398,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
               consentVersion={initialData!.consentVersion}
               name={name}
               slug={slug}
+              participantHost={participantHost}
               heroImageUrl={registration.heroImageUrl}
               content={registration.content}
               consentNotice={registration.consentNotice}
@@ -431,6 +435,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         onPreviewChange={setPreview}
         name={name}
         slug={slug}
+        participantHost={participantHost}
         primaryColor={primaryColor}
         heroImageUrl={registration.heroImageUrl}
         content={registration.content}
