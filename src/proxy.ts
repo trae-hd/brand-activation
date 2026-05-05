@@ -29,6 +29,14 @@ export function proxy(req: NextRequest) {
   // Health endpoint is reachable on any host.
   if (path === "/api/health") return NextResponse.next();
 
+  // Participant-host root → serve the participant landing. We rewrite `/` to
+  // `/welcome` (which lives in the participant route group) because Next.js
+  // can't have two `page.tsx` files resolve to the same `/` path: the admin
+  // route group already owns `/`. The URL bar still shows `/`.
+  if (path === "/" && host === participantHost) {
+    return NextResponse.rewrite(new URL("/welcome", req.url));
+  }
+
   // NextAuth handler is reachable only on the admin host.
   if (path.startsWith("/api/auth/")) {
     return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
