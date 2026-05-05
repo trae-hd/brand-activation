@@ -1,11 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { env } from "@/lib/env";
 
+// Per the Next.js 16 Proxy docs: proxy.ts is bundled separately from the rest
+// of the app and "should not rely on shared modules or globals." We read
+// process.env directly here instead of importing `@/lib/env` so the proxy
+// bundle stays self-contained and can't fail to initialise on a side-effecty
+// module load. Validation still runs at server startup via lib/env.ts.
 export function proxy(req: NextRequest) {
-  const adminHost = env.ADMIN_HOST.toLowerCase();
-  const participantHost = env.PARTICIPANT_HOST.toLowerCase();
+  const adminHost = (process.env.ADMIN_HOST ?? "").toLowerCase();
+  const participantHost = (process.env.PARTICIPANT_HOST ?? "").toLowerCase();
   const host = req.headers.get("host")?.toLowerCase() ?? "";
   const path = req.nextUrl.pathname;
+
+  // Fail-safe: if hosts aren't configured, block all non-local traffic so a
+  // misconfiguration can never accidentally expose admin pages on the
+  // participant host (or vice versa).
+  if (!adminHost || !participantHost) {
+    if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
+      return NextResponse.next();
+    }
+    return new NextResponse(null, { status: 503 });
+  }
 
   // In local development all routes are reachable on localhost.
   if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
