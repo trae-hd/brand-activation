@@ -104,9 +104,26 @@ export const authOptions: NextAuthOptions = {
       const name =
         (profile as Record<string, string> | undefined)?.name ??
         lowerEmail.split("@")[0];
-      await prisma.adminUser.create({
+      const created = await prisma.adminUser.create({
         data: { email: lowerEmail, name, role: "MEMBER", active: true },
       });
+      // Distinct audit event so the "who self-onboarded vs. who was invited"
+      // question is answerable from the audit log alone. The events.signIn
+      // hook below will *also* fire and record user.signed_in — that's
+      // intentional: auto_provisioned tracks first-touch, signed_in tracks
+      // every login. Failures here must not block sign-in.
+      try {
+        await writeAuditLog({
+          category: "SECURITY",
+          action: "user.auto_provisioned",
+          actorId: created.id,
+          targetType: "AdminUser",
+          targetId: created.id,
+          metadata: { method: "auth0", role: "MEMBER" },
+        });
+      } catch (err) {
+        console.error("[auth] failed to write user.auto_provisioned audit log", err);
+      }
       return true;
     },
 
