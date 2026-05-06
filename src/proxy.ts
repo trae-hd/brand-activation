@@ -58,7 +58,11 @@ export function proxy(req: NextRequest) {
     path.startsWith("/activations/") ||
     path.startsWith("/dashboard/") ||
     path.startsWith("/admin/") ||
-    path.startsWith("/auth/")
+    path.startsWith("/auth/") ||
+    path.startsWith("/settings") ||
+    path.startsWith("/methodology") ||
+    path.startsWith("/help") ||
+    path.startsWith("/feedback")
   ) {
     return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
