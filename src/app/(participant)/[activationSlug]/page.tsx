@@ -21,6 +21,7 @@ const getActivation = (slug: string) =>
           consentNotice: true,
           consentVersion: true,
           consentItems: true,
+          mrqContactConsentEnabled: true,
           ctaText: true,
           heroImageUrl: true,
           heroImageAlt: true,
@@ -138,6 +139,7 @@ export default async function LandingPage({
         consentNotice={activation.consentNotice}
         consentVersion={activation.consentVersion}
         consentItems={activation.consentItems}
+        mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
         ctaText={activation.ctaText ?? null}
       />
       <hr className="my-4 border-border" />

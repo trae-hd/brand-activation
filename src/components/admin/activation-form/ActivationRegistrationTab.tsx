@@ -81,6 +81,11 @@ export function ActivationRegistrationTab({ value, onChange, onAnyChange }: Prop
           onChange({ ...value, consentItems: items });
           onAnyChange();
         }}
+        mrqContactConsentEnabled={value.mrqContactConsentEnabled}
+        onMrqContactConsentEnabledChange={(v) => {
+          onChange({ ...value, mrqContactConsentEnabled: v });
+          onAnyChange();
+        }}
       />
 
       {/* CTA copy */}

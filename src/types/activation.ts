@@ -36,6 +36,7 @@ export interface RegistrationFormState {
   termsContent: unknown;
   heroImageUrl: string;
   heroImageAlt: string;
+  mrqContactConsentEnabled: boolean;
 }
 
 export interface SuccessFormState {
@@ -101,6 +102,7 @@ export interface ActivationFormInitialData {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  mrqContactConsentEnabled: boolean;
 }
 
 export interface ActivationFormProps {

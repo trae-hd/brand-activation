@@ -97,6 +97,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
     termsContent: initialData?.termsContent ?? EMPTY_DOC,
     heroImageUrl: initialData?.heroImageUrl ?? "",
     heroImageAlt: initialData?.heroImageAlt ?? "",
+    mrqContactConsentEnabled: initialData?.mrqContactConsentEnabled ?? true,
   });
 
   // ── Success tab state ──────────────────────────────────────────────
@@ -184,6 +185,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         utmSource: utmSource.trim() || null,
         utmMedium: utmMedium.trim() || null,
         utmCampaign: utmCampaign.trim() || null,
+        mrqContactConsentEnabled: registration.mrqContactConsentEnabled,
       };
       if (mode === "create") {
         const result = await trpc.activation.create.mutate(payload);

@@ -3,8 +3,27 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
+import type { Prisma } from "@prisma/client";
 
 const PAGE = 500;
+
+function parseConsentItemLabels(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((x) => x !== null && typeof x === "object" && typeof (x as { text?: unknown }).text === "string")
+    .map((x) => String((x as { text: string }).text));
+}
+
+function parseConsentItemsAccepted(raw: unknown): { text: string; accepted: boolean }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (x): x is { text: string; accepted: boolean } =>
+      x !== null &&
+      typeof x === "object" &&
+      typeof (x as { text?: unknown }).text === "string" &&
+      typeof (x as { accepted?: unknown }).accepted === "boolean",
+  );
+}
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -16,22 +35,45 @@ export async function GET(req: Request) {
   const activationId = searchParams.get("activationId");
   if (!activationId) return new NextResponse(null, { status: 400 });
 
+  const mrqConsentParam = searchParams.get("mrqContactConsent");
+  const mrqContactConsentFilter =
+    mrqConsentParam === "true" ? true : mrqConsentParam === "false" ? false : undefined;
+
   const activation = await prisma.activation.findUnique({
     where: { id: activationId },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, consentItems: true, mrqContactConsentEnabled: true },
   });
   if (!activation) return new NextResponse(null, { status: 404 });
 
+  const consentLabels = parseConsentItemLabels(activation.consentItems);
   const actorId = session.user.adminUserId;
+
+  const baseWhere: Prisma.RegistrationWhereInput = { activationId, status: "VERIFIED" };
+  if (mrqContactConsentFilter !== undefined) {
+    baseWhere.mrqContactConsent = mrqContactConsentFilter;
+  }
+
+  const consentHeaders = consentLabels.map((_, i) => `consent_${i + 1}`);
+  if (activation.mrqContactConsentEnabled) consentHeaders.push("mrq_contact_consent");
+
+  const filenameSuffix = mrqContactConsentFilter === true ? "-mrq-consented" : "";
+  const filename = `${activation.slug}-registrations${filenameSuffix}.csv`;
+
+  const headerRow = [
+    "email",
+    "registeredAt",
+    "verifiedAt",
+    "boothCode",
+    "utmSource",
+    "utmMedium",
+    "utmCampaign",
+    ...consentHeaders,
+  ].join(",") + "\n";
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
-      controller.enqueue(
-        encoder.encode(
-          "email,registeredAt,verifiedAt,boothCode,utmSource,utmMedium,utmCampaign\n"
-        )
-      );
+      controller.enqueue(encoder.encode(headerRow));
 
       let cursor: string | undefined;
       let rowCount = 0;
@@ -39,7 +81,7 @@ export async function GET(req: Request) {
       try {
         while (true) {
           const batch = await prisma.registration.findMany({
-            where: { activationId, status: "VERIFIED" },
+            where: baseWhere,
             orderBy: { id: "asc" },
             take: PAGE,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -52,10 +94,20 @@ export async function GET(req: Request) {
               utmSource: true,
               utmMedium: true,
               utmCampaign: true,
+              mrqContactConsent: true,
+              consentItemsAccepted: true,
             },
           });
           if (batch.length === 0) break;
+
           for (const r of batch) {
+            const accepted = parseConsentItemsAccepted(r.consentItemsAccepted);
+            const consentCols = consentLabels.map((_, i) =>
+              accepted[i]?.accepted ? "true" : "false",
+            );
+            if (activation.mrqContactConsentEnabled) {
+              consentCols.push(r.mrqContactConsent ? "true" : "false");
+            }
             controller.enqueue(
               encoder.encode(
                 csvRow([
@@ -66,8 +118,9 @@ export async function GET(req: Request) {
                   r.utmSource ?? "",
                   r.utmMedium ?? "",
                   r.utmCampaign ?? "",
-                ])
-              )
+                  ...consentCols,
+                ]),
+              ),
             );
             rowCount++;
           }
@@ -84,9 +137,10 @@ export async function GET(req: Request) {
           actorId,
           targetType: "Activation",
           targetId: activationId,
-          metadata: { rowCount, slug: activation.slug },
+          metadata: { rowCount, slug: activation.slug, mrqContactConsentFilter },
         });
       } catch (err) {
+        console.error("[export] stream error:", err);
         controller.error(err);
       }
     },
@@ -95,7 +149,7 @@ export async function GET(req: Request) {
   return new NextResponse(stream, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${activation.slug}-registrations.csv"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },
   });

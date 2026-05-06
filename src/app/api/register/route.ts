@@ -9,6 +9,8 @@ import { signPendingToken } from "@/lib/otp/pendingToken";
 import { emailProvider } from "@/lib/email/provider";
 import { Prisma } from "@prisma/client";
 
+const ConsentItemAccepted = z.object({ text: z.string(), accepted: z.boolean() });
+
 const Body = z.object({
   activationId: z.string().min(1),
   email: z.string().email().max(254).transform((s) => s.toLowerCase()),
@@ -17,6 +19,8 @@ const Body = z.object({
   utmSource: z.string().nullable().optional(),
   utmMedium: z.string().nullable().optional(),
   utmCampaign: z.string().nullable().optional(),
+  mrqContactConsent: z.boolean(),
+  consentItemsAccepted: z.array(ConsentItemAccepted).optional(),
 });
 
 const OK_202 = (pendingToken: string) =>
@@ -28,7 +32,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const parsed = Body.safeParse(body);
     if (!parsed.success) return ERR(400);
-    const { activationId, email, consentVersion, boothCode, utmSource, utmMedium, utmCampaign } =
+    const { activationId, email, consentVersion, boothCode, utmSource, utmMedium, utmCampaign, mrqContactConsent, consentItemsAccepted } =
       parsed.data;
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
@@ -79,6 +83,8 @@ export async function POST(req: Request) {
           userAgentHash,
           consentVersion,
           consentAcceptedAt: new Date(),
+          mrqContactConsent,
+          consentItemsAccepted: consentItemsAccepted ?? [],
         },
         select: { id: true, status: true },
       });

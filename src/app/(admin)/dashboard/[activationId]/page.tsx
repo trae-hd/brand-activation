@@ -15,7 +15,7 @@ export default async function DashboardPage({
 
   const activation = await prisma.activation.findUnique({
     where: { id: activationId },
-    select: { id: true, name: true, status: true, endsAt: true },
+    select: { id: true, name: true, status: true, endsAt: true, consentItems: true, mrqContactConsentEnabled: true },
   });
   if (!activation) notFound();
 
@@ -28,7 +28,11 @@ export default async function DashboardPage({
           status={activation.status}
           endsAt={activation.endsAt.toISOString()}
         />
-        <RegistrationsTable activationId={activation.id} />
+        <RegistrationsTable
+          activationId={activation.id}
+          consentItems={activation.consentItems}
+          mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
+        />
       </div>
     </AdminShell>
   );

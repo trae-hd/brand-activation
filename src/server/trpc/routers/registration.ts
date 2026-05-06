@@ -21,6 +21,8 @@ interface RegistrationRow {
   mrqRegisteredAt: Date | null;
   mrqLastLoginAt: Date | null;
   mrqEnrichedAt: Date | null;
+  mrqContactConsent: boolean;
+  consentItemsAccepted: unknown;
 }
 
 const StatusFilterSchema = z
@@ -166,6 +168,7 @@ export const registrationRouter = router({
         cursor: z.string().optional(),
         take: z.number().min(1).max(100).default(50),
         status: StatusFilterSchema,
+        mrqContactConsent: z.boolean().optional(),
       })
     )
     .query(
@@ -174,10 +177,16 @@ export const registrationRouter = router({
       }): Promise<{ items: RegistrationRow[]; nextCursor: string | null; total: number }> => {
         const statusWhere =
           input.status === "ALL" ? {} : { status: input.status as RegistrationStatus };
+        const consentWhere =
+          input.mrqContactConsent !== undefined
+            ? { mrqContactConsent: input.mrqContactConsent }
+            : {};
+
+        const where = { activationId: input.activationId, ...statusWhere, ...consentWhere };
 
         const [rows, total] = await Promise.all([
           prisma.registration.findMany({
-            where: { activationId: input.activationId, ...statusWhere },
+            where,
             orderBy: { registeredAt: "desc" },
             take: input.take + 1,
             ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
@@ -197,11 +206,11 @@ export const registrationRouter = router({
               mrqRegisteredAt: true,
               mrqLastLoginAt: true,
               mrqEnrichedAt: true,
+              mrqContactConsent: true,
+              consentItemsAccepted: true,
             },
           }),
-          prisma.registration.count({
-            where: { activationId: input.activationId, ...statusWhere },
-          }),
+          prisma.registration.count({ where }),
         ]);
 
         let nextCursor: string | null = null;

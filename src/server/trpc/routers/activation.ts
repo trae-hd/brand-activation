@@ -72,6 +72,7 @@ const ActivationWriteSchema = z.object({
   utmSource: z.string().max(100).optional().nullable(),
   utmMedium: z.string().max(100).optional().nullable(),
   utmCampaign: z.string().max(100).optional().nullable(),
+  mrqContactConsentEnabled: z.boolean().optional().default(true),
 });
 
 interface ActivationListItem {
@@ -105,6 +106,7 @@ interface ActivationDetail extends ActivationListItem {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  mrqContactConsentEnabled: boolean;
 }
 
 function assertTiptapValid(doc: unknown, allowlist: typeof CONTENT_ALLOWLIST | typeof CONSENT_ALLOWLIST, field: string) {
@@ -187,6 +189,7 @@ export const activationRouter = router({
           utmSource: true,
           utmMedium: true,
           utmCampaign: true,
+          mrqContactConsentEnabled: true,
           booths: {
             select: { id: true, code: true, label: true },
             orderBy: { createdAt: "asc" },
@@ -263,6 +266,7 @@ export const activationRouter = router({
           utmSource: input.utmSource ?? null,
           utmMedium: input.utmMedium ?? null,
           utmCampaign: input.utmCampaign ?? null,
+          mrqContactConsentEnabled: input.mrqContactConsentEnabled ?? true,
         },
         select: { id: true },
       });
@@ -415,6 +419,7 @@ export const activationRouter = router({
             utmSource: input.data.utmSource ?? null,
             utmMedium: input.data.utmMedium ?? null,
             utmCampaign: input.data.utmCampaign ?? null,
+            mrqContactConsentEnabled: input.data.mrqContactConsentEnabled ?? true,
           },
           select: { id: true },
         });

@@ -59,6 +59,7 @@ export default async function EditActivationPage({ params }: EditActivationPageP
       utmSource: true,
       utmMedium: true,
       utmCampaign: true,
+      mrqContactConsentEnabled: true,
       booths: {
         select: { id: true, code: true, label: true },
         orderBy: { createdAt: "asc" },

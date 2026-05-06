@@ -64,6 +64,37 @@ const MRQ_STATUS_CONFIG: Record<MrqAccountStatus, { label: string; cls: string }
   NOT_FOUND: { label: "No account", cls: "bg-muted text-muted-foreground/60" },
 };
 
+interface ConsentItemAccepted {
+  text: string;
+  accepted: boolean;
+}
+
+function parseConsentItemsAccepted(raw: unknown): ConsentItemAccepted[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (x): x is ConsentItemAccepted =>
+      x !== null &&
+      typeof x === "object" &&
+      typeof (x as ConsentItemAccepted).text === "string" &&
+      typeof (x as ConsentItemAccepted).accepted === "boolean",
+  );
+}
+
+function parseActivationConsentItems(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((x) => x !== null && typeof x === "object" && typeof (x as { text?: unknown }).text === "string")
+    .map((x) => String((x as { text: string }).text));
+}
+
+function ConsentCheck({ accepted }: { accepted: boolean }) {
+  return (
+    <span className={accepted ? "text-green-600 dark:text-green-400" : "text-muted-foreground/50"}>
+      {accepted ? "✓" : "✗"}
+    </span>
+  );
+}
+
 function MrqAccountBadge({ status }: { status: MrqAccountStatus }) {
   const config = MRQ_STATUS_CONFIG[status];
   if (!config) return <span className="text-muted-foreground/40">—</span>;
@@ -76,10 +107,15 @@ function MrqAccountBadge({ status }: { status: MrqAccountStatus }) {
 
 interface Props {
   activationId: string;
+  consentItems: unknown;
+  mrqContactConsentEnabled: boolean;
 }
 
-export function RegistrationsTable({ activationId }: Props) {
+export function RegistrationsTable({ activationId, consentItems, mrqContactConsentEnabled }: Props) {
+  const consentLabels = parseActivationConsentItems(consentItems);
+  const consentColCount = consentLabels.length + (mrqContactConsentEnabled ? 1 : 0);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [mrqConsentFilter, setMrqConsentFilter] = useState<boolean | null>(null);
   const [search, setSearch] = useState("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
@@ -88,7 +124,12 @@ export function RegistrationsTable({ activationId }: Props) {
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
     trpcReact.registration.list.useInfiniteQuery(
-      { activationId, take: 50, status: statusFilter },
+      {
+        activationId,
+        take: 50,
+        status: statusFilter,
+        mrqContactConsent: mrqConsentFilter ?? undefined,
+      },
       {
         getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
       }
@@ -147,7 +188,7 @@ export function RegistrationsTable({ activationId }: Props) {
             </span>
           )}
           <a
-            href={`/api/admin/registrations/export?activationId=${activationId}`}
+            href={`/api/admin/registrations/export?activationId=${activationId}${mrqConsentFilter === true ? "&mrqContactConsent=true" : ""}`}
             download
             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
           >
@@ -171,6 +212,21 @@ export function RegistrationsTable({ activationId }: Props) {
             {label}
           </button>
         ))}
+        {mrqContactConsentEnabled && (
+          <>
+            <span className="text-border select-none">|</span>
+            <button
+              onClick={() => setMrqConsentFilter((f) => (f === true ? null : true))}
+              className={
+                mrqConsentFilter === true
+                  ? "rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background"
+                  : "rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+              }
+            >
+              MrQ consented
+            </button>
+          </>
+        )}
         <div className="flex-1" />
         <Input
           placeholder="Search email or hash…"
@@ -190,6 +246,18 @@ export function RegistrationsTable({ activationId }: Props) {
               <th className="px-4 py-3 text-left font-medium">Booth</th>
               <th className="px-4 py-3 text-left font-medium">UTM</th>
               <th className="px-4 py-3 text-left font-medium">IP hash</th>
+              {consentLabels.map((label, i) => (
+                <th key={i} className="px-4 py-3 text-left font-medium max-w-[140px]">
+                  <span title={label} className="block truncate text-xs font-medium">
+                    {label}
+                  </span>
+                </th>
+              ))}
+              {mrqContactConsentEnabled && (
+                <th className="px-4 py-3 text-left font-medium whitespace-nowrap text-xs">
+                  MrQ contact
+                </th>
+              )}
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">MRQ account</th>
               <th className="px-4 py-3 text-left font-medium">MRQ joined</th>
@@ -203,7 +271,7 @@ export function RegistrationsTable({ activationId }: Props) {
             {visibleItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={10 + consentColCount}
                   className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   {data ? "No registrations match." : "Loading…"}
@@ -229,6 +297,23 @@ export function RegistrationsTable({ activationId }: Props) {
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {r.ipHash.slice(0, 8)}…
                     </td>
+                    {(() => {
+                      const accepted = parseConsentItemsAccepted(r.consentItemsAccepted);
+                      return (
+                        <>
+                          {consentLabels.map((label, i) => (
+                            <td key={i} className="px-4 py-2.5 text-center">
+                              <ConsentCheck accepted={accepted[i]?.accepted ?? false} />
+                            </td>
+                          ))}
+                          {mrqContactConsentEnabled && (
+                            <td className="px-4 py-2.5 text-center">
+                              <ConsentCheck accepted={r.mrqContactConsent} />
+                            </td>
+                          )}
+                        </>
+                      );
+                    })()}
                     <td className="px-4 py-2.5">
                       <StatusPill status={r.status} />
                     </td>

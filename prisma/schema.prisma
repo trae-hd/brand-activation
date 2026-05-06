@@ -121,6 +121,10 @@ model Activation {
   utmMedium   String?
   utmCampaign String?
 
+  // ── Consent settings ──
+  /// When true, a mandatory "agree to be contacted by MrQ if winner" checkbox is shown on the registration form.
+  mrqContactConsentEnabled Boolean @default(true)
+
   // ── Peer review fields ──
   reviewStatus  ActivationReviewStatus @default(DRAFT)
   submittedAt   DateTime?
@@ -192,6 +196,11 @@ model Registration {
   mrqLastLoginAt   DateTime?
   /// When the MRQ enrichment check was last executed for this registration.
   mrqEnrichedAt    DateTime?
+
+  /// Whether the participant consented to being contacted by MrQ if they win. Mandatory on all activations.
+  mrqContactConsent Boolean @default(false)
+  /// Snapshot of each configurable consent checkbox shown at registration time: [{text, accepted}].
+  consentItemsAccepted Json?
 
   @@unique([activationId, emailHash])
   @@unique([activationId, entryCode])

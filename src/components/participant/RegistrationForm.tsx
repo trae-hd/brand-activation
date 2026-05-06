@@ -17,6 +17,7 @@ interface Props {
   consentNotice: unknown;
   consentVersion: string;
   consentItems?: unknown;
+  mrqContactConsentEnabled: boolean;
   ctaText: string | null;
 }
 
@@ -40,8 +41,10 @@ export function RegistrationForm(props: Props) {
 
   // For multi-item consent, track each checkbox independently.
   const [itemChecks, setItemChecks] = useState<boolean[]>(() => items.map(() => false));
+  const [mrqContactConsent, setMrqContactConsent] = useState(false);
   const allConsentsChecked =
-    items.length > 0 ? itemChecks.every(Boolean) : consentAccepted;
+    (items.length > 0 ? itemChecks.every(Boolean) : consentAccepted) &&
+    (!props.mrqContactConsentEnabled || mrqContactConsent);
 
   const submit = () => {
     setError(null);
@@ -58,6 +61,11 @@ export function RegistrationForm(props: Props) {
             utmSource: props.utmSource,
             utmMedium: props.utmMedium,
             utmCampaign: props.utmCampaign,
+            mrqContactConsent,
+            consentItemsAccepted: items.map((item, i) => ({
+              text: item.text,
+              accepted: itemChecks[i] ?? false,
+            })),
           }),
         });
         if (res.status === 503) {
@@ -146,6 +154,23 @@ export function RegistrationForm(props: Props) {
           <label htmlFor="reg-consent" className="text-sm leading-snug">
             I&apos;m 18+ and accept the{" "}
             <ConsentBlock notice={props.consentNotice} />
+          </label>
+        </div>
+      )}
+
+      {/* MrQ winner contact consent — shown only when enabled on the activation */}
+      {props.mrqContactConsentEnabled && (
+        <div className="flex items-start gap-2">
+          <input
+            id="reg-consent-mrq"
+            type="checkbox"
+            checked={mrqContactConsent}
+            onChange={(e) => setMrqContactConsent(e.target.checked)}
+            required
+            className="mt-0.5 shrink-0"
+          />
+          <label htmlFor="reg-consent-mrq" className="text-sm leading-snug">
+            I agree to be contacted by MrQ if I am selected as a winner.
           </label>
         </div>
       )}
