@@ -55,12 +55,9 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
       <CardContent className="flex flex-col gap-5 pt-6">
         <div className="text-center">
           <div className="text-3xl font-bold tracking-tight">HQ</div>
-          <div className="text-xs font-medium text-muted-foreground">MrQ Live · Admin</div>
-        </div>
-
-        <div>
-          <h1 className="text-xl font-semibold">Sign in</h1>
-          <p className="text-sm text-muted-foreground">@mrq.com only.</p>
+          <div className="text-muted-foreground text-xs font-medium">
+            MrQ Live · Admin
+          </div>
         </div>
 
         <Button
@@ -77,8 +74,8 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
           Continue with MrQ SSO
         </Button>
 
-        <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-          <span className="relative z-10 bg-card px-2 text-muted-foreground">or</span>
+        <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
+          <span className="bg-card text-muted-foreground relative z-10 px-2">or</span>
         </div>
 
         <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-3">
@@ -111,7 +108,7 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center px-3"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -121,7 +118,7 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
           </div>
 
           {error && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="text-destructive text-sm" role="alert">
               {error}
             </p>
           )}
@@ -129,11 +126,16 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
           <div className="flex items-center justify-between">
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              className="text-muted-foreground text-sm underline-offset-4 hover:underline"
             >
               Forgot password?
             </Link>
-            <Button type="submit" variant="outline" size="sm" disabled={isPasswordLoading}>
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={isPasswordLoading}
+            >
               {isPasswordLoading ? (
                 <DynamicIcon name="Loader2" className="animate-spin" />
               ) : (
