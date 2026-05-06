@@ -357,6 +357,10 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
             onAnyChange={markDirty}
             activationId={initialData?.id}
             mode={mode}
+            slug={slug}
+            startsAt={startsAt}
+            endsAt={endsAt}
+            entryCodePrefix={entryCodePrefix}
           />
         )}
 

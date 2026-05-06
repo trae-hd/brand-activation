@@ -17,11 +17,25 @@ interface Props {
   onAnyChange: () => void;
   activationId?: string;
   mode: "create" | "edit";
+  slug: string;
+  startsAt: string;
+  endsAt: string;
+  entryCodePrefix: string;
 }
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
-export function ActivationSuccessTab({ value, onChange, onAnyChange, activationId, mode }: Props) {
+function formatDatetimeLocal(raw: string): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+  return d.toLocaleString("en-GB", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+export function ActivationSuccessTab({ value, onChange, onAnyChange, activationId, mode, slug, startsAt, endsAt, entryCodePrefix }: Props) {
   const handleContentChange = useCallback(
     (doc: unknown) => {
       onChange({ ...value, successContent: doc });
@@ -46,13 +60,29 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
     <div className="flex flex-col gap-6">
       <SuccessTabBanner activationId={activationId} mode={mode} />
 
-      {/* Linked fields info */}
+      {/* Shared fields read-only summary */}
       <div className="flex items-start gap-2.5 rounded-md border bg-muted/20 px-3 py-2.5">
         <DynamicIcon name="Info" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">
-          Dates, slug, and entry code prefix are shared with the registration page — set them in the
-          main form above.
-        </p>
+        <div className="flex flex-col gap-1 min-w-0">
+          <p className="text-xs text-muted-foreground">
+            Dates, slug, and entry code prefix are shared with the registration page — edit them in
+            the main form above.
+          </p>
+          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+            <dt className="text-muted-foreground/70 font-medium">Slug</dt>
+            <dd className="font-mono text-foreground truncate">{slug || <span className="text-muted-foreground/50 italic">not set</span>}</dd>
+            <dt className="text-muted-foreground/70 font-medium">Starts</dt>
+            <dd className="text-foreground">{formatDatetimeLocal(startsAt)}</dd>
+            <dt className="text-muted-foreground/70 font-medium">Ends</dt>
+            <dd className="text-foreground">{formatDatetimeLocal(endsAt)}</dd>
+            {entryCodePrefix && (
+              <>
+                <dt className="text-muted-foreground/70 font-medium">Code prefix</dt>
+                <dd className="font-mono text-foreground">{entryCodePrefix.toUpperCase()}</dd>
+              </>
+            )}
+          </dl>
+        </div>
       </div>
 
       {/* ── Confirmation message ──────────────────────────────────── */}
