@@ -139,8 +139,11 @@ export function StatusTransitionDialog({
   const contentOk = countFilledParagraphs(content) >= 1;
   const hasConsentItems = Array.isArray(consentItems) && consentItems.length > 0;
   const consentOk = hasConsentItems || countFilledParagraphs(consentNotice) >= 1;
-  const boothOk = boothCount >= 1;
-  const preflightOk = isReviewApproved && contentOk && consentOk && boothOk;
+  // Booths are optional — activations can run with a single non-booth QR.
+  // The row below is kept as an informational confidence signal (configured
+  // count, or "single QR mode" when zero), but it does not gate going LIVE.
+  const hasBooths = boothCount >= 1;
+  const preflightOk = isReviewApproved && contentOk && consentOk;
   const slugOk = slugInput === slug;
 
   const canConfirm =
@@ -343,13 +346,13 @@ export function StatusTransitionDialog({
                   }
                 />
                 <PreflightRow
-                  pass={boothOk}
-                  blocking
-                  label="At least one booth"
+                  pass={hasBooths}
+                  blocking={false}
+                  label="Booths"
                   sub={
-                    boothOk
+                    hasBooths
                       ? `${boothCount} booth${boothCount !== 1 ? "s" : ""} configured`
-                      : "Add a booth in the Booths tab"
+                      : "Single QR mode — no booths configured (optional)"
                   }
                 />
               </div>
