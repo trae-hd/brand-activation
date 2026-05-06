@@ -111,6 +111,8 @@ export interface ActivationFormProps {
   currentUserId?: string;
   initialData?: ActivationFormInitialData;
   participantBaseUrl: string;
+  /** Short-lived HMAC token that lets the participant page render a DRAFT for preview without requiring a cross-domain admin session. */
+  previewToken?: string;
 }
 
 export interface StatusTransitionDialogProps {

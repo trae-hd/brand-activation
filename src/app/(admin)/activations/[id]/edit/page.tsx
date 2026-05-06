@@ -7,6 +7,7 @@ import { AdminShell } from "@/components/shared/layouts/AdminShell";
 import { ActivationForm } from "@/components/admin/ActivationForm";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { env } from "@/lib/env";
+import { signPreviewToken } from "@/lib/preview/token";
 
 interface EditActivationPageProps {
   params: Promise<{ id: string }>;
@@ -92,6 +93,7 @@ export default async function EditActivationPage({ params }: EditActivationPageP
           currentUserId={session.user.adminUserId ?? undefined}
           initialData={activation}
           participantBaseUrl={env.PUBLIC_BASE_URL}
+          previewToken={signPreviewToken(id)}
         />
       </Suspense>
     </AdminShell>

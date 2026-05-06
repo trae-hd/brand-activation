@@ -4,6 +4,7 @@ import Image from "next/image";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
+import { verifyPreviewToken } from "@/lib/preview/token";
 import { RegistrationForm } from "@/components/participant/RegistrationForm";
 import { NotifyMeForm } from "@/components/participant/NotifyMeForm";
 import { TermsAccordion } from "@/components/participant/TermsAccordion";
@@ -76,8 +77,11 @@ export default async function LandingPage({
   if (activation.status === "ENDED" && !isPreview) redirect(`/${activationSlug}/ended`);
   if (activation.status === "DRAFT") {
     if (!isPreview) notFound();
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.adminUserId) notFound();
+    const tokenValid = sp.pt ? verifyPreviewToken(activation.id, sp.pt) : false;
+    if (!tokenValid) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.adminUserId) notFound();
+    }
   }
 
   if (activation.status === "SCHEDULED") {

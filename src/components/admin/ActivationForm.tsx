@@ -56,7 +56,7 @@ function autoSlug(value: string): string {
     .replace(/\s+/g, "-");
 }
 
-export function ActivationForm({ mode, userRole, currentUserId, initialData, participantBaseUrl }: ActivationFormProps) {
+export function ActivationForm({ mode, userRole, currentUserId, initialData, participantBaseUrl, previewToken }: ActivationFormProps) {
   const router = useRouter();
   const { tab, preview, setTab, setPreview } = useTabUrlState();
   const isAdmin = userRole === "ADMIN";
@@ -320,7 +320,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
           {(["registration", "success"] as const).map((t) => {
             const previewHref =
               mode === "edit" && slug
-                ? `${participantBaseUrl}/${slug}${t === "success" ? "/success" : ""}?preview=true`
+                ? `${participantBaseUrl}/${slug}${t === "success" ? "/success" : ""}?preview=true${previewToken ? `&pt=${previewToken}` : ""}`
                 : null;
             return (
               <div
