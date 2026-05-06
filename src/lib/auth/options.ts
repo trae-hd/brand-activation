@@ -1,5 +1,5 @@
 import type { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import Auth0Provider from "next-auth/providers/auth0";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -28,15 +28,10 @@ const DUMMY_BCRYPT_HASH =
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      authorization: {
-        params: {
-          hd: env.GOOGLE_WORKSPACE_DOMAIN,
-          prompt: "select_account",
-        },
-      },
+    Auth0Provider({
+      clientId: env.AUTH0_CLIENT_ID,
+      clientSecret: env.AUTH0_CLIENT_SECRET,
+      issuer: `https://${env.AUTH0_DOMAIN}`,
     }),
     CredentialsProvider({
       id: "password",
@@ -94,24 +89,17 @@ export const authOptions: NextAuthOptions = {
     async signIn({ profile, user }) {
       const email = profile?.email ?? user?.email;
       if (!isAllowedEmail(email)) return false;
-      // The Google `hd` parameter only restricts the picker; re-verify here.
-      if (profile?.email && profile.email.split("@")[1] !== env.GOOGLE_WORKSPACE_DOMAIN) {
-        return false;
-      }
+      // Invite-only: SSO sign-in is rejected unless an AdminUser row already
+      // exists. New admins must be added via the invite flow (Admin → Users
+      // → Invite), which creates the row up-front. Auto-provisioning would
+      // open the admin app to anyone in the Auth0 directory matching
+      // ALLOWED_EMAIL_DOMAIN, which is broader than we want.
       const lowerEmail = email!.toLowerCase();
       const admin = await prisma.adminUser.findUnique({
         where: { email: lowerEmail },
         select: { id: true, active: true },
       });
-      if (admin) return admin.active;
-      // First-time Google sign-in from an allowed domain → auto-provision as MEMBER
-      const name =
-        (profile as Record<string, string> | undefined)?.name ??
-        lowerEmail.split("@")[0];
-      await prisma.adminUser.create({
-        data: { email: lowerEmail, name, role: "MEMBER", active: true },
-      });
-      return true;
+      return admin?.active ?? false;
     },
 
     async jwt({ token, profile, user }) {
@@ -162,7 +150,7 @@ export const authOptions: NextAuthOptions = {
         category: "SECURITY",
         action: "user.signed_in",
         actorId: admin.id,
-        metadata: { method: account?.provider === "google" ? "google" : "password" },
+        metadata: { method: account?.provider === "auth0" ? "auth0" : "password" },
       });
     },
 

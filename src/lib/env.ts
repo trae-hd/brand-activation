@@ -14,9 +14,11 @@ const schema = z.object({
   // NextAuth
   NEXTAUTH_URL: z.string().url(),
   NEXTAUTH_SECRET: z.string().min(32),
-  GOOGLE_CLIENT_ID: z.string().min(1),
-  GOOGLE_CLIENT_SECRET: z.string().min(1),
-  GOOGLE_WORKSPACE_DOMAIN: z.string().min(1),
+
+  // Auth0 SSO (provisioned via MrQ Hub at mrq-vibes.uk.auth0.com).
+  AUTH0_DOMAIN: z.string().min(1),
+  AUTH0_CLIENT_ID: z.string().min(1),
+  AUTH0_CLIENT_SECRET: z.string().min(1),
 
   // Email
   RESEND_API_KEY: z.string().min(1),
