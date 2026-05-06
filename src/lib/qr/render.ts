@@ -12,6 +12,16 @@ export async function renderQrPng(url: string): Promise<Buffer> {
 export async function renderBoothQrPng(opts: {
   activationSlug: string;
   boothCode: string;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
 }): Promise<Buffer> {
-  return renderQrPng(getActivationUrl(opts.activationSlug, { boothCode: opts.boothCode }));
+  return renderQrPng(
+    getActivationUrl(opts.activationSlug, {
+      boothCode: opts.boothCode,
+      utmSource: opts.utmSource,
+      utmMedium: opts.utmMedium,
+      utmCampaign: opts.utmCampaign,
+    }),
+  );
 }

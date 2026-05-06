@@ -3,7 +3,13 @@ import { prisma } from "@/lib/db/prisma";
 import { renderQrPng } from "@/lib/qr/render";
 import { getActivationUrl } from "@/lib/url/activationUrl";
 
-export async function streamBoothQrZip(activationId: string): Promise<{
+interface UtmOpts {
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+}
+
+export async function streamBoothQrZip(activationId: string, utm: UtmOpts = {}): Promise<{
   stream: ReadableStream;
   filename: string;
 } | null> {
@@ -26,10 +32,21 @@ export async function streamBoothQrZip(activationId: string): Promise<{
 
       (async () => {
         try {
+          const utmSuffix = [utm.utmSource, utm.utmMedium, utm.utmCampaign]
+            .filter(Boolean)
+            .join("__");
           for (const booth of activation.booths) {
-            const url = getActivationUrl(activation.slug, { boothCode: booth.code });
+            const url = getActivationUrl(activation.slug, {
+              boothCode: booth.code,
+              utmSource: utm.utmSource,
+              utmMedium: utm.utmMedium,
+              utmCampaign: utm.utmCampaign,
+            });
             const png = await renderQrPng(url);
-            archive.append(png, { name: `${activation.slug}-${booth.code}.png` });
+            const name = utmSuffix
+              ? `${activation.slug}-${booth.code}__${utmSuffix}.png`
+              : `${activation.slug}-${booth.code}.png`;
+            archive.append(png, { name });
           }
           await archive.finalize();
         } catch (err) {
@@ -39,5 +56,9 @@ export async function streamBoothQrZip(activationId: string): Promise<{
     },
   });
 
-  return { stream, filename: `${activation.slug}-qrs.zip` };
+  const utmSuffix = [utm.utmSource, utm.utmMedium, utm.utmCampaign].filter(Boolean).join("__");
+  const filename = utmSuffix
+    ? `${activation.slug}__${utmSuffix}-qrs.zip`
+    : `${activation.slug}-qrs.zip`;
+  return { stream, filename };
 }

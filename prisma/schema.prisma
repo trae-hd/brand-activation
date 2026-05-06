@@ -116,6 +116,11 @@ model Activation {
   successSponsorCtaLabel String?
   successSponsorCtaUrl   String?
 
+  // ── Default UTM parameters (pre-filled in the UTM builder) ──
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+
   // ── Peer review fields ──
   reviewStatus  ActivationReviewStatus @default(DRAFT)
   submittedAt   DateTime?

@@ -56,6 +56,9 @@ export default async function EditActivationPage({ params }: EditActivationPageP
       successSponsorBody: true,
       successSponsorCtaLabel: true,
       successSponsorCtaUrl: true,
+      utmSource: true,
+      utmMedium: true,
+      utmCampaign: true,
       booths: {
         select: { id: true, code: true, label: true },
         orderBy: { createdAt: "asc" },

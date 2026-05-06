@@ -68,6 +68,10 @@ const ActivationWriteSchema = z.object({
   successSponsorBody: z.string().max(90).optional().nullable(),
   successSponsorCtaLabel: z.string().max(100).optional().nullable(),
   successSponsorCtaUrl: z.string().url().optional().nullable(),
+  // UTM defaults
+  utmSource: z.string().max(100).optional().nullable(),
+  utmMedium: z.string().max(100).optional().nullable(),
+  utmCampaign: z.string().max(100).optional().nullable(),
 });
 
 interface ActivationListItem {
@@ -98,6 +102,9 @@ interface ActivationDetail extends ActivationListItem {
   reviewNotes: string | null;
   updatedAt: Date;
   booths: { id: string; code: string; label: string }[];
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
 }
 
 function assertTiptapValid(doc: unknown, allowlist: typeof CONTENT_ALLOWLIST | typeof CONSENT_ALLOWLIST, field: string) {
@@ -177,6 +184,9 @@ export const activationRouter = router({
           createdById: true,
           updatedAt: true,
           _count: { select: { registrations: true } },
+          utmSource: true,
+          utmMedium: true,
+          utmCampaign: true,
           booths: {
             select: { id: true, code: true, label: true },
             orderBy: { createdAt: "asc" },
@@ -250,6 +260,9 @@ export const activationRouter = router({
           successSponsorBody: input.successSponsorBody ?? null,
           successSponsorCtaLabel: input.successSponsorCtaLabel ?? null,
           successSponsorCtaUrl: input.successSponsorCtaUrl ?? null,
+          utmSource: input.utmSource ?? null,
+          utmMedium: input.utmMedium ?? null,
+          utmCampaign: input.utmCampaign ?? null,
         },
         select: { id: true },
       });
@@ -399,6 +412,9 @@ export const activationRouter = router({
             successSponsorBody: input.data.successSponsorBody ?? null,
             successSponsorCtaLabel: input.data.successSponsorCtaLabel ?? null,
             successSponsorCtaUrl: input.data.successSponsorCtaUrl ?? null,
+            utmSource: input.data.utmSource ?? null,
+            utmMedium: input.data.utmMedium ?? null,
+            utmCampaign: input.data.utmCampaign ?? null,
           },
           select: { id: true },
         });

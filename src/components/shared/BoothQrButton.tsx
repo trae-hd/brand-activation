@@ -6,15 +6,21 @@ interface Props {
   activationId: string;
   boothCode: string;
   label?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
 }
 
-export function BoothQrButton({ activationId, boothCode, label = "Download QR" }: Props) {
+export function BoothQrButton({ activationId, boothCode, label = "Download QR", utmSource, utmMedium, utmCampaign }: Props) {
   const utils = trpcReact.useUtils();
 
   const onClick = async () => {
     const { filename, base64 } = await utils.booth.getQrPng.fetch({
       activationId,
       boothCode,
+      utmSource: utmSource?.trim() || undefined,
+      utmMedium: utmMedium?.trim() || undefined,
+      utmCampaign: utmCampaign?.trim() || undefined,
     });
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const blob = new Blob([bytes], { type: "image/png" });

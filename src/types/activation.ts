@@ -98,6 +98,9 @@ export interface ActivationFormInitialData {
   successSponsorBody: string | null;
   successSponsorCtaLabel: string | null;
   successSponsorCtaUrl: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
 }
 
 export interface ActivationFormProps {

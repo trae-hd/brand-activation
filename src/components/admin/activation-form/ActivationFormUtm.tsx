@@ -9,12 +9,13 @@ interface Props {
   slug: string;
   activationId?: string;
   participantBaseUrl: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  onUtmChange: (field: "utmSource" | "utmMedium" | "utmCampaign", value: string) => void;
 }
 
-export function ActivationFormUtm({ slug, activationId, participantBaseUrl }: Props) {
-  const [utmSource, setUtmSource] = useState("");
-  const [utmMedium, setUtmMedium] = useState("");
-  const [utmCampaign, setUtmCampaign] = useState("");
+export function ActivationFormUtm({ slug, activationId, participantBaseUrl, utmSource, utmMedium, utmCampaign, onUtmChange }: Props) {
   const [utmCopied, setUtmCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -76,9 +77,9 @@ export function ActivationFormUtm({ slug, activationId, participantBaseUrl }: Pr
       <div className="rounded-md border bg-muted/5 p-3">
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Source", value: utmSource, onChange: setUtmSource, placeholder: "email" },
-            { label: "Medium", value: utmMedium, onChange: setUtmMedium, placeholder: "newsletter" },
-            { label: "Campaign", value: utmCampaign, onChange: setUtmCampaign, placeholder: "boxing_2026" },
+            { label: "Source", value: utmSource, onChange: (v: string) => onUtmChange("utmSource", v), placeholder: "email" },
+            { label: "Medium", value: utmMedium, onChange: (v: string) => onUtmChange("utmMedium", v), placeholder: "newsletter" },
+            { label: "Campaign", value: utmCampaign, onChange: (v: string) => onUtmChange("utmCampaign", v), placeholder: "boxing_2026" },
           ].map(({ label, value, onChange, placeholder }) => (
             <div key={label} className="flex flex-col gap-1">
               <label className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">

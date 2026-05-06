@@ -15,9 +15,23 @@ interface Props {
   activationId?: string;
   booths: BoothRow[];
   onBoothsChange: (booths: BoothRow[]) => void;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
 }
 
-export function ActivationFormBooths({ mode, activationId, booths, onBoothsChange }: Props) {
+export function ActivationFormBooths({ mode, activationId, booths, onBoothsChange, utmSource, utmMedium, utmCampaign }: Props) {
+  const hasUtm = !!(utmSource?.trim() || utmMedium?.trim() || utmCampaign?.trim());
+
+  const zipHref = (() => {
+    if (!activationId) return "";
+    const params = new URLSearchParams();
+    if (utmSource?.trim()) params.set("utm_source", utmSource.trim());
+    if (utmMedium?.trim()) params.set("utm_medium", utmMedium.trim());
+    if (utmCampaign?.trim()) params.set("utm_campaign", utmCampaign.trim());
+    const qs = params.toString();
+    return `/api/admin/activations/${activationId}/qr-zip${qs ? `?${qs}` : ""}`;
+  })();
   const [newBoothCode, setNewBoothCode] = useState("");
   const [newBoothLabel, setNewBoothLabel] = useState("");
   const [boothError, setBoothError] = useState<string | null>(null);
@@ -58,13 +72,20 @@ export function ActivationFormBooths({ mode, activationId, booths, onBoothsChang
       <div className="flex items-center justify-between">
         <SectionLabel>Booths</SectionLabel>
         {mode === "edit" && activationId && booths.length > 0 && (
-          <a
-            href={`/api/admin/activations/${activationId}/qr-zip`}
-            download
-            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Download all QRs (zip)
-          </a>
+          <div className="flex flex-col items-end gap-0.5">
+            <a
+              href={zipHref}
+              download
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Download all QRs (zip)
+            </a>
+            {!hasUtm && (
+              <span className="text-[10px] text-muted-foreground/60">
+                Set UTM parameters above to include them in QR codes
+              </span>
+            )}
+          </div>
         )}
       </div>
       {mode === "create" ? (
@@ -97,6 +118,9 @@ export function ActivationFormBooths({ mode, activationId, booths, onBoothsChang
                       activationId={activationId!}
                       boothCode={b.code}
                       label="QR ↓"
+                      utmSource={utmSource}
+                      utmMedium={utmMedium}
+                      utmCampaign={utmCampaign}
                     />
                     <Button
                       type="button"

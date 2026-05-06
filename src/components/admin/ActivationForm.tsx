@@ -78,6 +78,15 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
   const [timezone, setTimezone] = useState(initialData?.timezone ?? "Europe/London");
   const [entryCodePrefix, setEntryCodePrefix] = useState(initialData?.entryCodePrefix ?? "");
   const [booths, setBooths] = useState<BoothRow[]>(initialData?.booths ?? []);
+  const [utmSource, setUtmSource] = useState(initialData?.utmSource ?? "");
+  const [utmMedium, setUtmMedium] = useState(initialData?.utmMedium ?? "");
+  const [utmCampaign, setUtmCampaign] = useState(initialData?.utmCampaign ?? "");
+
+  function handleUtmChange(field: "utmSource" | "utmMedium" | "utmCampaign", value: string) {
+    if (field === "utmSource") setUtmSource(value);
+    else if (field === "utmMedium") setUtmMedium(value);
+    else setUtmCampaign(value);
+  }
 
   // ── Registration tab state ─────────────────────────────────────────
   const [registration, setRegistration] = useState<RegistrationFormState>({
@@ -172,6 +181,9 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         successSponsorBody: success.successSponsorBody.trim() || null,
         successSponsorCtaLabel: success.successSponsorCtaLabel.trim() || null,
         successSponsorCtaUrl: success.successSponsorCtaUrl.trim() || null,
+        utmSource: utmSource.trim() || null,
+        utmMedium: utmMedium.trim() || null,
+        utmCampaign: utmCampaign.trim() || null,
       };
       if (mode === "create") {
         const result = await trpc.activation.create.mutate(payload);
@@ -377,13 +389,24 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
 
         <Rule />
 
-        <ActivationFormUtm slug={slug} activationId={initialData?.id} participantBaseUrl={participantBaseUrl} />
+        <ActivationFormUtm
+          slug={slug}
+          activationId={initialData?.id}
+          participantBaseUrl={participantBaseUrl}
+          utmSource={utmSource}
+          utmMedium={utmMedium}
+          utmCampaign={utmCampaign}
+          onUtmChange={handleUtmChange}
+        />
 
         <ActivationFormBooths
           mode={mode}
           activationId={initialData?.id}
           booths={booths}
           onBoothsChange={setBooths}
+          utmSource={utmSource}
+          utmMedium={utmMedium}
+          utmCampaign={utmCampaign}
         />
 
         {mode === "edit" && (

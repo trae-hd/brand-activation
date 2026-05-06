@@ -5,7 +5,7 @@ import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import { streamBoothQrZip } from "@/lib/qr/zipStream";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
@@ -18,7 +18,13 @@ export async function GET(
   }
 
   const { id } = await ctx.params;
-  const result = await streamBoothQrZip(id);
+  const { searchParams } = new URL(req.url);
+  const utm = {
+    utmSource: searchParams.get("utm_source") ?? undefined,
+    utmMedium: searchParams.get("utm_medium") ?? undefined,
+    utmCampaign: searchParams.get("utm_campaign") ?? undefined,
+  };
+  const result = await streamBoothQrZip(id, utm);
 
   if (!result) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

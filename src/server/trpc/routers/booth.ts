@@ -146,6 +146,9 @@ export const boothRouter = router({
       z.object({
         activationId: z.string().min(1),
         boothCode: z.string().min(1),
+        utmSource: z.string().optional(),
+        utmMedium: z.string().optional(),
+        utmCampaign: z.string().optional(),
       })
     )
     .query(async ({ input }): Promise<{ filename: string; base64: string }> => {
@@ -166,11 +169,18 @@ export const boothRouter = router({
       const png = await renderBoothQrPng({
         activationSlug: booth.activation.slug,
         boothCode: booth.code,
+        utmSource: input.utmSource,
+        utmMedium: input.utmMedium,
+        utmCampaign: input.utmCampaign,
       });
 
-      return {
-        filename: `${booth.activation.slug}-${booth.code}.png`,
-        base64: png.toString("base64"),
-      };
+      const utmSuffix = [input.utmSource, input.utmMedium, input.utmCampaign]
+        .filter(Boolean)
+        .join("__");
+      const filename = utmSuffix
+        ? `${booth.activation.slug}-${booth.code}__${utmSuffix}.png`
+        : `${booth.activation.slug}-${booth.code}.png`;
+
+      return { filename, base64: png.toString("base64") };
     }),
 });
