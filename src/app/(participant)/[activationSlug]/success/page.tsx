@@ -4,6 +4,7 @@ import Image from "next/image";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
+import { verifyPreviewToken } from "@/lib/preview/token";
 import { SuccessSessionData } from "@/components/participant/SuccessSessionData";
 
 // ── Cache (matches landing page pattern) ──────────────────────────
@@ -74,8 +75,11 @@ export default async function SuccessPage({
   if (!activation) notFound();
   if (activation.status === "DRAFT") {
     if (!isPreview) notFound();
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.adminUserId) notFound();
+    const tokenValid = sp.pt ? verifyPreviewToken(activation.id, sp.pt) : false;
+    if (!tokenValid) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.adminUserId) notFound();
+    }
   }
 
   // Field defaults
