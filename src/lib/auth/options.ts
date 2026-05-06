@@ -89,17 +89,25 @@ export const authOptions: NextAuthOptions = {
     async signIn({ profile, user }) {
       const email = profile?.email ?? user?.email;
       if (!isAllowedEmail(email)) return false;
-      // Invite-only: SSO sign-in is rejected unless an AdminUser row already
-      // exists. New admins must be added via the invite flow (Admin → Users
-      // → Invite), which creates the row up-front. Auto-provisioning would
-      // open the admin app to anyone in the Auth0 directory matching
-      // ALLOWED_EMAIL_DOMAIN, which is broader than we want.
       const lowerEmail = email!.toLowerCase();
       const admin = await prisma.adminUser.findUnique({
         where: { email: lowerEmail },
         select: { id: true, active: true },
       });
-      return admin?.active ?? false;
+      // Existing user — honour their active flag (deactivation must remain
+      // effective). Note: deletion of a row would let SSO re-create it as a
+      // fresh MEMBER below — team policy is "deactivate, don't delete".
+      if (admin) return admin.active;
+      // First-time SSO sign-in from an allowed domain → auto-provision as
+      // MEMBER. ADMIN role must be granted explicitly (via invite or by an
+      // existing ADMIN promoting them in the Users page).
+      const name =
+        (profile as Record<string, string> | undefined)?.name ??
+        lowerEmail.split("@")[0];
+      await prisma.adminUser.create({
+        data: { email: lowerEmail, name, role: "MEMBER", active: true },
+      });
+      return true;
     },
 
     async jwt({ token, profile, user }) {
