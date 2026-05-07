@@ -5,8 +5,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
+import { CharCount } from "@/components/ui/CharCount";
 import type { ConsentItem } from "@/types/activation";
 import { SectionLabel } from "./form-section";
+
+const CONSENT_TEXT_MAX = 500;
 
 const MRQ_CONTACT_CONSENT_TEXT = "I agree to be contacted by MrQ if I am selected as a winner.";
 
@@ -30,20 +33,22 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
       {consentItems.length > 0 && (
         <div className="flex flex-col gap-2">
           {consentItems.map((item, i) => (
-            <div key={item.id} className="flex items-center gap-2">
-              <div className="border-foreground/30 h-4 w-4 shrink-0 rounded-sm border" />
-              <Input
-                value={item.text}
-                onChange={(e) =>
-                  onChange(
-                    consentItems.map((ci, idx) =>
-                      idx === i ? { ...ci, text: e.target.value } : ci,
-                    ),
-                  )
-                }
-                placeholder="Type consent text…"
-                className="h-8 flex-1 text-sm"
-              />
+            <div key={item.id} className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <div className="border-foreground/30 h-4 w-4 shrink-0 rounded-sm border" />
+                <Input
+                  value={item.text}
+                  onChange={(e) =>
+                    onChange(
+                      consentItems.map((ci, idx) =>
+                        idx === i ? { ...ci, text: e.target.value } : ci,
+                      ),
+                    )
+                  }
+                  placeholder="Type consent text…"
+                  maxLength={CONSENT_TEXT_MAX}
+                  className="h-8 flex-1 text-sm"
+                />
               <label
                 className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs whitespace-nowrap"
                 title="When unchecked, participants can register without ticking this item."
@@ -71,6 +76,10 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
               >
                 <DynamicIcon name="X" className="h-3.5 w-3.5" />
               </Button>
+              </div>
+              <p className="ml-6 text-xs">
+                <CharCount value={item.text} max={CONSENT_TEXT_MAX} />
+              </p>
             </div>
           ))}
         </div>

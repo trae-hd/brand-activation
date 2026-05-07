@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { Input } from "@/components/ui/input";
+import { CharCount } from "@/components/ui/CharCount";
 import { SectionLabel } from "./form-section";
 
 interface Props {
@@ -124,7 +125,7 @@ export function ActivationFormHeroImage({
       {heroImageUrl && onAltTextChange !== undefined && (
         <div className="flex flex-col gap-1">
           <label className="text-muted-foreground text-[10px] font-medium uppercase tracking-wide">
-            Alt text
+            Alt text <CharCount value={altText ?? ""} max={500} className="text-[10px]" />
           </label>
           <Input
             value={altText ?? ""}

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { TiptapEditor } from "@/components/admin/TiptapEditor";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CharCount } from "@/components/ui/CharCount";
 import { CONTENT_ALLOWLIST } from "@/lib/tiptap/allowlists";
 import type { SuccessFormState } from "@/types/activation";
 import { ActivationFormHeroImage } from "./ActivationFormHeroImage";
@@ -87,7 +88,9 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
 
       {/* ── Confirmation message ──────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
-        <SectionLabel>Heading</SectionLabel>
+        <SectionLabel>
+          Heading <CharCount value={value.successHeading} max={200} />
+        </SectionLabel>
         <Input
           value={value.successHeading}
           onChange={(e) => set("successHeading", e.target.value)}
@@ -103,7 +106,8 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
       <div className="flex flex-col gap-1.5">
         <SectionLabel>
           Subheading{" "}
-          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>
+          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>{" "}
+          <CharCount value={value.successSubheading} max={500} />
         </SectionLabel>
         <Input
           value={value.successSubheading}
@@ -129,7 +133,9 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
       {/* ── Main CTA ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <SectionLabel>CTA label</SectionLabel>
+          <SectionLabel>
+            CTA label <CharCount value={value.successCtaLabel} max={100} />
+          </SectionLabel>
           <Input
             value={value.successCtaLabel}
             onChange={(e) => set("successCtaLabel", e.target.value)}
@@ -200,7 +206,8 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
       <div className="flex flex-col gap-1.5">
         <SectionLabel>
           Sponsor name{" "}
-          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>
+          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>{" "}
+          <CharCount value={value.successSponsorName} max={200} />
         </SectionLabel>
         <Input
           value={value.successSponsorName}
@@ -231,7 +238,8 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
       <div className="flex flex-col gap-1.5">
         <SectionLabel>
           Sponsor headline{" "}
-          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>
+          <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>{" "}
+          <CharCount value={value.successSponsorHeadline} max={200} />
         </SectionLabel>
         <Input
           value={value.successSponsorHeadline}
@@ -244,10 +252,7 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
 
       <div className="flex flex-col gap-1.5">
         <SectionLabel>
-          Short description{" "}
-          <span className="text-muted-foreground/60 tracking-normal normal-case">
-            ({value.successSponsorBody.length}/90)
-          </span>
+          Short description <CharCount value={value.successSponsorBody} max={90} />
         </SectionLabel>
         <Input
           value={value.successSponsorBody}
@@ -262,7 +267,8 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
         <div className="flex flex-col gap-1.5">
           <SectionLabel>
             Sponsor CTA label{" "}
-            <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>
+            <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>{" "}
+            <CharCount value={value.successSponsorCtaLabel} max={100} />
           </SectionLabel>
           <Input
             value={value.successSponsorCtaLabel}

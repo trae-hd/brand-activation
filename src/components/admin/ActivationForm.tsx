@@ -250,8 +250,19 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
             markDirty();
           }}
           placeholder={mode === "create" ? "New Activation" : "Activation name"}
+          maxLength={200}
           className="placeholder:text-muted-foreground/40 hover:border-muted-foreground/20 focus:border-primary w-full border-b border-transparent bg-transparent pb-0.5 text-2xl font-semibold transition-colors outline-none"
         />
+        {name.length > 0 && (
+          <p
+            className={`-mt-0.5 text-[10px] tracking-wide ${
+              name.length > 200 ? "text-destructive" : "text-muted-foreground/50"
+            }`}
+            aria-live="polite"
+          >
+            ({name.length}/200)
+          </p>
+        )}
 
         {initialData && (
           <StatusTransitionDialog

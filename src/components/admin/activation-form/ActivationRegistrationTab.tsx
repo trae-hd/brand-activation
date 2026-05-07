@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { TiptapEditor } from "@/components/admin/TiptapEditor";
 import { Input } from "@/components/ui/input";
+import { CharCount } from "@/components/ui/CharCount";
 import { CONTENT_ALLOWLIST, CONSENT_ALLOWLIST } from "@/lib/tiptap/allowlists";
 import type { RegistrationFormState } from "@/types/activation";
 import { ActivationFormHeroImage } from "./ActivationFormHeroImage";
@@ -90,7 +91,9 @@ export function ActivationRegistrationTab({ value, onChange, onAnyChange }: Prop
 
       {/* CTA copy */}
       <div className="flex flex-col gap-1.5">
-        <SectionLabel>CTA copy</SectionLabel>
+        <SectionLabel>
+          CTA copy <CharCount value={value.ctaText} max={100} />
+        </SectionLabel>
         <Input
           value={value.ctaText}
           onChange={(e) => {
