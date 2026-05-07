@@ -8,6 +8,7 @@ interface Props {
   successCtaUrl: string | null;
   showEntryCode: boolean;
   showResend: boolean;
+  showCta: boolean;
   primaryColor: string | null;
   isPreview?: boolean;
 }
@@ -18,6 +19,7 @@ export function SuccessSessionData({
   successCtaUrl,
   showEntryCode,
   showResend,
+  showCta,
   primaryColor,
   isPreview = false,
 }: Props) {
@@ -95,24 +97,26 @@ export function SuccessSessionData({
         </div>
       )}
 
-      {successCtaUrl ? (
-        <a
-          href={successCtaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`mt-4 block w-full rounded-md px-4 py-3 text-center text-sm font-semibold ${btnClass}`}
-          style={btnStyle}
-        >
-          {successCtaLabel}
-        </a>
-      ) : (
-        <button
-          type="button"
-          className={`mt-4 w-full rounded-md px-4 py-3 text-sm font-semibold ${btnClass}`}
-          style={btnStyle}
-        >
-          {successCtaLabel}
-        </button>
+      {showCta && (
+        successCtaUrl ? (
+          <a
+            href={successCtaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`mt-4 block w-full rounded-md px-4 py-3 text-center text-sm font-semibold ${btnClass}`}
+            style={btnStyle}
+          >
+            {successCtaLabel}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className={`mt-4 w-full rounded-md px-4 py-3 text-sm font-semibold ${btnClass}`}
+            style={btnStyle}
+          >
+            {successCtaLabel}
+          </button>
+        )
       )}
 
       {showResend && (

@@ -60,6 +60,7 @@ const ActivationWriteSchema = z.object({
   successCtaUrl: z.string().url().optional().nullable(),
   successShowEntryCode: z.boolean().optional().default(true),
   successShowResend: z.boolean().optional().default(true),
+  successShowCta: z.boolean().optional().default(true),
   // Sponsor block
   successSponsorName: z.string().max(200).optional().nullable(),
   successSponsorLogoUrl: z.string().optional().nullable(),
@@ -255,6 +256,7 @@ export const activationRouter = router({
           successCtaUrl: input.successCtaUrl ?? null,
           successShowEntryCode: input.successShowEntryCode ?? true,
           successShowResend: input.successShowResend ?? true,
+          successShowCta: input.successShowCta ?? true,
           // Sponsor block
           successSponsorName: input.successSponsorName ?? null,
           successSponsorLogoUrl: input.successSponsorLogoUrl ?? null,
@@ -323,6 +325,7 @@ export const activationRouter = router({
             successCtaUrl: true,
             successShowEntryCode: true,
             successShowResend: true,
+            successShowCta: true,
             successSponsorName: true,
             successSponsorLogoUrl: true,
             successSponsorLogoAlt: true,
@@ -408,6 +411,7 @@ export const activationRouter = router({
             successCtaUrl: input.data.successCtaUrl ?? null,
             successShowEntryCode: input.data.successShowEntryCode ?? true,
             successShowResend: input.data.successShowResend ?? true,
+            successShowCta: input.data.successShowCta ?? true,
             // Sponsor block
             successSponsorName: input.data.successSponsorName ?? null,
             successSponsorLogoUrl: input.data.successSponsorLogoUrl ?? null,
@@ -672,6 +676,7 @@ export const activationRouter = router({
           successCtaUrl: true,
           successShowEntryCode: true,
           successShowResend: true,
+          successShowCta: true,
           successSponsorName: true,
           successSponsorLogoUrl: true,
           successSponsorLogoAlt: true,

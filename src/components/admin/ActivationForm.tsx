@@ -109,6 +109,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
     successCtaUrl: initialData?.successCtaUrl ?? "",
     successShowEntryCode: initialData?.successShowEntryCode ?? true,
     successShowResend: initialData?.successShowResend ?? true,
+    successShowCta: initialData?.successShowCta ?? true,
     successSponsorName: initialData?.successSponsorName ?? "",
     successSponsorLogoUrl: initialData?.successSponsorLogoUrl ?? "",
     successSponsorLogoAlt: initialData?.successSponsorLogoAlt ?? "",
@@ -174,6 +175,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         successCtaUrl: success.successCtaUrl.trim() || null,
         successShowEntryCode: success.successShowEntryCode,
         successShowResend: success.successShowResend,
+        successShowCta: success.successShowCta,
         // Sponsor block
         successSponsorName: success.successSponsorName.trim() || null,
         successSponsorLogoUrl: success.successSponsorLogoUrl || null,
@@ -478,6 +480,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         successCtaLabel={success.successCtaLabel}
         successShowEntryCode={success.successShowEntryCode}
         successShowResend={success.successShowResend}
+        successShowCta={success.successShowCta}
         successSponsorLogoUrl={success.successSponsorLogoUrl}
         successSponsorHeadline={success.successSponsorHeadline}
         successSponsorBody={success.successSponsorBody}

@@ -50,6 +50,7 @@ export default async function EditActivationPage({ params }: EditActivationPageP
       successCtaUrl: true,
       successShowEntryCode: true,
       successShowResend: true,
+      successShowCta: true,
       successSponsorName: true,
       successSponsorLogoUrl: true,
       successSponsorLogoAlt: true,

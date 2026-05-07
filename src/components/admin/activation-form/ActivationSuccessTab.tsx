@@ -173,6 +173,17 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
           />
           <span className="text-sm">Show &ldquo;Resend&rdquo; link</span>
         </label>
+        <label className="flex items-center gap-2.5 cursor-pointer">
+          <Checkbox
+            checked={value.successShowCta}
+            onCheckedChange={(checked) => set("successShowCta", checked === true)}
+          />
+          <span className="text-sm">Show CTA button</span>
+        </label>
+        <p className="text-muted-foreground -mt-1 ml-7 text-xs">
+          Hide for activations where there&apos;s no follow-up email or external action to nudge the
+          participant to.
+        </p>
       </div>
 
       <Rule />

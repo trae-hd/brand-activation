@@ -25,6 +25,7 @@ const getActivation = (slug: string) =>
           successCtaUrl: true,
           successShowEntryCode: true,
           successShowResend: true,
+          successShowCta: true,
           successSponsorName: true,
           successSponsorLogoUrl: true,
           successSponsorLogoAlt: true,
@@ -89,6 +90,7 @@ export default async function SuccessPage({
   const ctaUrl = activation.successCtaUrl ?? null;
   const showEntryCode = activation.successShowEntryCode ?? true;
   const showResend = activation.successShowResend ?? true;
+  const showCta = activation.successShowCta ?? true;
 
   const contentLines = renderParagraphs(activation.successContent);
 
@@ -130,23 +132,17 @@ export default async function SuccessPage({
         </div>
       )}
 
-      {/* Inbox nudge (always shown — no hardcoded copy replacement) */}
-      <div className="mt-5 w-full rounded-md bg-muted/30 p-4">
-        <div className="flex items-start gap-3">
-          <span className="text-xl" aria-hidden="true">📩</span>
-          <p className="text-sm text-muted-foreground">
-            Check your inbox for what&apos;s next.
-          </p>
-        </div>
-      </div>
-
-      {/* Client island — reads sessionStorage, renders entry code + CTA + resend */}
+      {/* Client island — reads sessionStorage, renders entry code + CTA + resend.
+          Post-verification copy (e.g. "check your inbox") is now authored in the
+          successContent rich-text block above. Admins who want that prompt add it
+          there; activations that don't follow up by email can leave it out. */}
       <SuccessSessionData
         activationSlug={activationSlug}
         successCtaLabel={ctaLabel}
         successCtaUrl={ctaUrl}
         showEntryCode={showEntryCode}
         showResend={showResend}
+        showCta={showCta}
         primaryColor={activation.primaryColor}
         isPreview={isPreview}
       />

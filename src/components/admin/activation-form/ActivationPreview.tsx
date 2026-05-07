@@ -68,6 +68,7 @@ interface Props {
   successCtaLabel?: string;
   successShowEntryCode?: boolean;
   successShowResend?: boolean;
+  successShowCta?: boolean;
   successSponsorLogoUrl?: string;
   successSponsorHeadline?: string;
   successSponsorBody?: string;
@@ -98,6 +99,7 @@ export function ActivationPreview({
   successCtaLabel,
   successShowEntryCode = true,
   successShowResend = true,
+  successShowCta = true,
   successSponsorLogoUrl,
   successSponsorHeadline,
   successSponsorBody,
@@ -142,6 +144,7 @@ export function ActivationPreview({
     successCtaLabel: successCtaLabel || "",
     successShowEntryCode,
     successShowResend,
+    successShowCta,
     successSponsorLogoUrl: successSponsorLogoUrl || "",
     successSponsorHeadline: successSponsorHeadline || "",
     successSponsorBody: successSponsorBody || "",
@@ -381,6 +384,7 @@ interface SuccessMobilePreviewProps {
   successCtaLabel: string;
   successShowEntryCode: boolean;
   successShowResend: boolean;
+  successShowCta: boolean;
   successSponsorLogoUrl: string;
   successSponsorHeadline: string;
   successSponsorBody: string;
@@ -396,6 +400,7 @@ function SuccessMobilePreview({
   successCtaLabel,
   successShowEntryCode,
   successShowResend,
+  successShowCta,
   successSponsorLogoUrl,
   successSponsorHeadline,
   successSponsorBody,
@@ -431,12 +436,14 @@ function SuccessMobilePreview({
               <p className="font-mono text-[13px] font-bold tracking-wider">ABC123</p>
             </div>
           )}
-          <div
-            className={cn("rounded py-1 text-center text-[10px] font-medium", btnClass)}
-            style={btnStyle}
-          >
-            {ctaLabel}
-          </div>
+          {successShowCta && (
+            <div
+              className={cn("rounded py-1 text-center text-[10px] font-medium", btnClass)}
+              style={btnStyle}
+            >
+              {ctaLabel}
+            </div>
+          )}
           {successShowResend && (
             <p className="text-center text-[9px] text-muted-foreground">
               Didn&apos;t get it? <span className="underline">Resend</span>

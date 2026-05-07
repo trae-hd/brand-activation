@@ -47,6 +47,7 @@ export interface SuccessFormState {
   successCtaUrl: string;
   successShowEntryCode: boolean;
   successShowResend: boolean;
+  successShowCta: boolean;
   // Sponsor block
   successSponsorName: string;
   successSponsorLogoUrl: string;
@@ -91,6 +92,7 @@ export interface ActivationFormInitialData {
   successCtaUrl: string | null;
   successShowEntryCode: boolean;
   successShowResend: boolean;
+  successShowCta: boolean;
   // Sponsor block
   successSponsorName: string | null;
   successSponsorLogoUrl: string | null;

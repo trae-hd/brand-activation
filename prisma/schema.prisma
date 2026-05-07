@@ -106,6 +106,7 @@ model Activation {
   successCtaUrl         String?
   successShowEntryCode  Boolean @default(true)
   successShowResend     Boolean @default(true)
+  successShowCta        Boolean @default(true)
 
   // ── Sponsor block (shown at bottom of success page; omitted when all null) ──
   successSponsorName     String?
