@@ -37,10 +37,16 @@ function parseConsentItems(raw: unknown): ConsentItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((item) => item && typeof item === "object" && "text" in item)
-    .map((item, i) => ({
-      id: `init-${i}`,
-      text: String((item as { text: unknown }).text ?? ""),
-    }));
+    .map((item, i) => {
+      const obj = item as { text: unknown; required?: unknown };
+      return {
+        id: `init-${i}`,
+        text: String(obj.text ?? ""),
+        // Items predating the per-item required flag default to required so
+        // existing activations behave exactly as they did before this change.
+        required: obj.required === false ? false : true,
+      };
+    });
 }
 
 function toDatetimeLocal(d: Date): string {
@@ -159,7 +165,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         endsAt: new Date(endsAt),
         content: registration.content as Record<string, unknown>,
         consentNotice: registration.consentNotice as Record<string, unknown>,
-        consentItems: registration.consentItems.map(({ text }) => ({ text })),
+        consentItems: registration.consentItems.map(({ text, required }) => ({ text, required })),
         ctaText: registration.ctaText.trim() || null,
         termsContent: registration.termsContent as Record<string, unknown>,
         primaryColor: primaryColor || null,

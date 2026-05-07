@@ -9,7 +9,16 @@ import { signPendingToken } from "@/lib/otp/pendingToken";
 import { emailProvider } from "@/lib/email/provider";
 import { Prisma } from "@prisma/client";
 
-const ConsentItemAccepted = z.object({ text: z.string(), accepted: z.boolean() });
+// `required` snapshots the consent item's required flag at the moment the
+// participant submitted, so the audit trail in consentItemsAccepted remains
+// unambiguous even if the activation's items are later edited. Older clients
+// (pre-required-flag) won't send the field — default to true so the audit
+// record reflects the original "all-required" semantics.
+const ConsentItemAccepted = z.object({
+  text: z.string(),
+  accepted: z.boolean(),
+  required: z.boolean().default(true),
+});
 
 const Body = z.object({
   activationId: z.string().min(1),

@@ -48,7 +48,14 @@ const ActivationWriteSchema = z.object({
     .nullable(),
   termsContent: TiptapDocSchema.optional().nullable(),
   consentItems: z
-    .array(z.object({ text: z.string().max(500) }))
+    .array(
+      z.object({
+        text: z.string().max(500),
+        // Default true so callers (and stored JSON) without an explicit
+        // required flag preserve the original "all-required" behaviour.
+        required: z.boolean().default(true),
+      }),
+    )
     .optional()
     .nullable(),
   ctaText: z.string().max(100).optional().nullable(),

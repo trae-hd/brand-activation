@@ -3,6 +3,12 @@ import type { ActivationStatus, ActivationReviewStatus, AdminRole } from "@prism
 export interface ConsentItem {
   id: string;
   text: string;
+  /** When true (default), participants must tick this item to register. When
+   *  false, the item is shown as a soft opt-in and registration succeeds even
+   *  if it's left unchecked. The flag is also snapshotted into each
+   *  Registration's consentItemsAccepted JSON at submit time so the audit
+   *  trail captures what was required at the moment of registration. */
+  required: boolean;
 }
 
 export interface BoothRow {

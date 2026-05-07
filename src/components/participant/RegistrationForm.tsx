@@ -5,6 +5,7 @@ import { ConsentBlock } from "./ConsentBlock";
 
 interface ConsentItemData {
   text: string;
+  required: boolean;
 }
 
 interface Props {
@@ -25,7 +26,15 @@ function parseItems(raw: unknown): ConsentItemData[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((item) => item && typeof item === "object" && "text" in item)
-    .map((item) => ({ text: String((item as { text: unknown }).text ?? "") }))
+    .map((item) => {
+      const obj = item as { text: unknown; required?: unknown };
+      return {
+        text: String(obj.text ?? ""),
+        // Items predating the per-item required flag default to required so
+        // existing activations behave exactly as they did before this change.
+        required: obj.required === false ? false : true,
+      };
+    })
     .filter((item) => item.text.trim().length > 0);
 }
 
@@ -42,8 +51,13 @@ export function RegistrationForm(props: Props) {
   // For multi-item consent, track each checkbox independently.
   const [itemChecks, setItemChecks] = useState<boolean[]>(() => items.map(() => false));
   const [mrqContactConsent, setMrqContactConsent] = useState(false);
+  // Required items must be ticked; optional items may be unchecked.
+  const requiredItemsChecked =
+    items.length > 0
+      ? items.every((it, i) => !it.required || itemChecks[i])
+      : consentAccepted;
   const allConsentsChecked =
-    (items.length > 0 ? itemChecks.every(Boolean) : consentAccepted) &&
+    requiredItemsChecked &&
     (!props.mrqContactConsentEnabled || mrqContactConsent);
 
   const submit = () => {
@@ -62,8 +76,11 @@ export function RegistrationForm(props: Props) {
             utmMedium: props.utmMedium,
             utmCampaign: props.utmCampaign,
             mrqContactConsent,
+            // Snapshot the required flag at submit time so the audit trail is
+            // unambiguous even if the activation's consent items are later edited.
             consentItemsAccepted: items.map((item, i) => ({
               text: item.text,
+              required: item.required,
               accepted: itemChecks[i] ?? false,
             })),
           }),
@@ -129,7 +146,7 @@ export function RegistrationForm(props: Props) {
                     return next;
                   })
                 }
-                required
+                required={item.required}
                 className="mt-0.5 shrink-0"
               />
               <label
@@ -137,6 +154,11 @@ export function RegistrationForm(props: Props) {
                 className="text-sm leading-snug"
               >
                 {item.text}
+                {item.required && (
+                  <span className="text-destructive ml-0.5" aria-label="required">
+                    *
+                  </span>
+                )}
               </label>
             </div>
           ))}

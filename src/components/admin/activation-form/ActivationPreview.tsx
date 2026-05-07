@@ -513,6 +513,7 @@ function ConsentPreview({
             <div className={cn("border-foreground/30 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
             <p className={cn("text-muted-foreground line-clamp-1 leading-tight", textSize)}>
               {item.text || "Consent item…"}
+              {item.required && <span className="text-destructive ml-0.5">*</span>}
             </p>
           </div>
         ))}

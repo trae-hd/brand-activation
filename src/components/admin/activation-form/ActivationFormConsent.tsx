@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
@@ -22,8 +23,8 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
       <div className="flex flex-col gap-2">
         <SectionLabel>Consent items</SectionLabel>
         <p className="text-muted-foreground text-xs">
-          Each item appears as a required checkbox on the registration form. Add one per consent
-          statement.
+          Each item appears as a checkbox on the registration form. Required items get a red
+          asterisk and must be ticked to register; optional items can be left unchecked.
         </p>
       </div>
       {consentItems.length > 0 && (
@@ -43,6 +44,23 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
                 placeholder="Type consent text…"
                 className="h-8 flex-1 text-sm"
               />
+              <label
+                className="flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-xs whitespace-nowrap"
+                title="When unchecked, participants can register without ticking this item."
+              >
+                <Checkbox
+                  checked={item.required}
+                  onCheckedChange={(checked) =>
+                    onChange(
+                      consentItems.map((ci, idx) =>
+                        idx === i ? { ...ci, required: checked === true } : ci,
+                      ),
+                    )
+                  }
+                  aria-label={`Required: ${item.text || "consent item"}`}
+                />
+                <span>Required</span>
+              </label>
               <Button
                 type="button"
                 variant="ghost"
@@ -62,7 +80,12 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
         variant="outline"
         size="sm"
         className="mt-1 h-8 w-fit text-xs"
-        onClick={() => onChange([...consentItems, { id: `item-${Date.now()}`, text: "" }])}
+        onClick={() =>
+          onChange([
+            ...consentItems,
+            { id: `item-${Date.now()}`, text: "", required: true },
+          ])
+        }
       >
         + Add consent item
       </Button>

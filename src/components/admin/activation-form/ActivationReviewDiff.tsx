@@ -8,10 +8,14 @@ function parseSnapshotConsentItems(raw: unknown): ConsentItem[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((item) => item && typeof item === "object" && "text" in item)
-    .map((item, i) => ({
-      id: `snap-${i}`,
-      text: String((item as { text: unknown }).text ?? ""),
-    }));
+    .map((item, i) => {
+      const obj = item as { text: unknown; required?: unknown };
+      return {
+        id: `snap-${i}`,
+        text: String(obj.text ?? ""),
+        required: obj.required === false ? false : true,
+      };
+    });
 }
 
 interface Props {
