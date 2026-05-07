@@ -1,9 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpcReact } from "@/lib/trpc/react";
 import { Input } from "@/components/ui/input";
 import type { MrqAccountStatus } from "@prisma/client";
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+
+/** Debounce a value so search inputs don't refire a query on every keystroke. */
+function useDebounced<T>(value: T, delayMs = 300): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 type StatusFilter = "ALL" | "VERIFIED" | "PENDING" | "EXPIRED";
 
@@ -109,34 +122,54 @@ interface Props {
   activationId: string;
   consentItems: unknown;
   mrqContactConsentEnabled: boolean;
+  /** Entry-code prefix for this activation, e.g. "WC". Used as a non-editable
+   *  affix on the entry-code search input. When null, the activation never
+   *  generates entry codes and the entry-code search is hidden. */
+  entryCodePrefix: string | null;
 }
 
-export function RegistrationsTable({ activationId, consentItems, mrqContactConsentEnabled }: Props) {
+export function RegistrationsTable({
+  activationId,
+  consentItems,
+  mrqContactConsentEnabled,
+  entryCodePrefix,
+}: Props) {
   const consentLabels = parseActivationConsentItems(consentItems);
   const consentColCount = consentLabels.length + (mrqContactConsentEnabled ? 1 : 0);
+  const hasEntryCodes = !!entryCodePrefix && entryCodePrefix.trim().length > 0;
+  const codePrefixUpper = (entryCodePrefix ?? "").toUpperCase();
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [mrqConsentFilter, setMrqConsentFilter] = useState<boolean | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(""); // client-side filter on current page (email/hash)
+  const [entryCodeSearch, setEntryCodeSearch] = useState(""); // server-side, suffix only
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(25);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+
+  // Reset to page 1 whenever a filter or page size changes — otherwise we
+  // could land on a page index that no longer exists in the new result set.
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, mrqConsentFilter, pageSize, entryCodeSearch]);
+
+  const debouncedEntryCodeSearch = useDebounced(entryCodeSearch, 300);
 
   const revealMutation = trpcReact.registration.revealEmail.useMutation();
   const enrichMutation = trpcReact.registration.enrich.useMutation();
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
-    trpcReact.registration.list.useInfiniteQuery(
-      {
-        activationId,
-        take: 50,
-        status: statusFilter,
-        mrqContactConsent: mrqConsentFilter ?? undefined,
-      },
-      {
-        getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-      }
-    );
+  const { data, refetch, isFetching } = trpcReact.registration.list.useQuery({
+    activationId,
+    page,
+    pageSize,
+    status: statusFilter,
+    mrqContactConsent: mrqConsentFilter ?? undefined,
+    entryCodeQuery: debouncedEntryCodeSearch.trim() || undefined,
+  });
 
-  const items = data?.pages.flatMap((p) => p.items) ?? [];
-  const total = data?.pages.at(-1)?.total ?? null;
+  const items = data?.items ?? [];
+  const total = data?.total ?? null;
+  const totalPages = data?.totalPages ?? 1;
 
   const searchLower = search.toLowerCase();
   const visibleItems = searchLower
@@ -228,6 +261,24 @@ export function RegistrationsTable({ activationId, consentItems, mrqContactConse
           </>
         )}
         <div className="flex-1" />
+        {hasEntryCodes && (
+          <div className="flex h-8 items-center overflow-hidden rounded-md border bg-background text-sm focus-within:ring-1 focus-within:ring-ring">
+            <span className="bg-muted/50 text-muted-foreground border-r px-2 py-1 font-mono text-xs whitespace-nowrap select-none">
+              {codePrefixUpper}-
+            </span>
+            <input
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="code"
+              value={entryCodeSearch}
+              onChange={(e) => setEntryCodeSearch(e.target.value.toUpperCase())}
+              aria-label="Search entry code suffix"
+              className="h-full w-32 bg-transparent px-2 font-mono text-xs uppercase tracking-wider outline-none"
+            />
+          </div>
+        )}
         <Input
           placeholder="Search email or hash…"
           value={search}
@@ -243,6 +294,9 @@ export function RegistrationsTable({ activationId, consentItems, mrqContactConse
             <tr>
               <th className="px-4 py-3 text-left font-medium">Verified at</th>
               <th className="px-4 py-3 text-left font-medium">Email</th>
+              {hasEntryCodes && (
+                <th className="px-4 py-3 text-left font-medium">Entry code</th>
+              )}
               <th className="px-4 py-3 text-left font-medium">Booth</th>
               <th className="px-4 py-3 text-left font-medium">UTM</th>
               <th className="px-4 py-3 text-left font-medium">IP hash</th>
@@ -271,7 +325,7 @@ export function RegistrationsTable({ activationId, consentItems, mrqContactConse
             {visibleItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10 + consentColCount}
+                  colSpan={10 + consentColCount + (hasEntryCodes ? 1 : 0)}
                   className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   {data ? "No registrations match." : "Loading…"}
@@ -288,6 +342,11 @@ export function RegistrationsTable({ activationId, consentItems, mrqContactConse
                     <td className="px-4 py-2.5 font-mono text-xs">
                       {isRevealed ? r.email : maskEmail(r.email)}
                     </td>
+                    {hasEntryCodes && (
+                      <td className="px-4 py-2.5 font-mono text-xs tabular-nums">
+                        {r.entryCode ?? <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                    )}
                     <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                       {r.boothCode ?? "—"}
                     </td>
@@ -346,20 +405,59 @@ export function RegistrationsTable({ activationId, consentItems, mrqContactConse
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>
-          Showing {visibleItems.length}
-          {total != null ? ` of ${total}` : ""}. Reveal logs to audit.
+          {total != null
+            ? total === 0
+              ? "No registrations."
+              : `Showing ${(page - 1) * pageSize + 1}–${
+                  (page - 1) * pageSize + visibleItems.length
+                } of ${total}.`
+            : "Loading…"}{" "}
+          Reveal logs to audit.
         </span>
-        {hasNextPage && (
-          <button
-            onClick={() => fetchNextPage()}
-            disabled={isFetchingNextPage}
-            className="underline-offset-4 hover:underline disabled:opacity-50"
-          >
-            {isFetchingNextPage ? "Loading…" : "Load more →"}
-          </button>
-        )}
+
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2">
+            <span>Rows per page</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) as PageSize)}
+              className="bg-background border rounded h-7 px-1 text-xs"
+              aria-label="Rows per page"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isFetching}
+              className="rounded border px-2 py-0.5 hover:text-foreground disabled:opacity-40"
+              aria-label="Previous page"
+            >
+              ← Prev
+            </button>
+            <span className="tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || isFetching}
+              className="rounded border px-2 py-0.5 hover:text-foreground disabled:opacity-40"
+              aria-label="Next page"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

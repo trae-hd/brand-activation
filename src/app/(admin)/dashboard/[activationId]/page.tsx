@@ -15,7 +15,15 @@ export default async function DashboardPage({
 
   const activation = await prisma.activation.findUnique({
     where: { id: activationId },
-    select: { id: true, name: true, status: true, endsAt: true, consentItems: true, mrqContactConsentEnabled: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      endsAt: true,
+      consentItems: true,
+      mrqContactConsentEnabled: true,
+      entryCodePrefix: true,
+    },
   });
   if (!activation) notFound();
 
@@ -32,6 +40,7 @@ export default async function DashboardPage({
           activationId={activation.id}
           consentItems={activation.consentItems}
           mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
+          entryCodePrefix={activation.entryCodePrefix}
         />
       </div>
     </AdminShell>

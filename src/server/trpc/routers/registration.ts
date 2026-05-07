@@ -13,6 +13,7 @@ interface RegistrationRow {
   registeredAt: Date;
   verifiedAt: Date | null;
   boothCode: string | null;
+  entryCode: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
@@ -165,31 +166,52 @@ export const registrationRouter = router({
     .input(
       z.object({
         activationId: z.string().min(1),
-        cursor: z.string().optional(),
-        take: z.number().min(1).max(100).default(50),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
         status: StatusFilterSchema,
         mrqContactConsent: z.boolean().optional(),
+        // Substring match against the entryCode column. Client passes whatever
+        // the user typed (typically the suffix after the activation prefix —
+        // the prefix is rendered as a non-editable affix in the search input);
+        // server matches anywhere in the full code so both "ABC123" and
+        // "WC-ABC123" find WC-ABC123.
+        entryCodeQuery: z.string().max(64).optional(),
       })
     )
     .query(
       async ({
         input,
-      }): Promise<{ items: RegistrationRow[]; nextCursor: string | null; total: number }> => {
+      }): Promise<{
+        items: RegistrationRow[];
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
+      }> => {
         const statusWhere =
           input.status === "ALL" ? {} : { status: input.status as RegistrationStatus };
         const consentWhere =
           input.mrqContactConsent !== undefined
             ? { mrqContactConsent: input.mrqContactConsent }
             : {};
+        const entryCodeWhere =
+          input.entryCodeQuery && input.entryCodeQuery.trim().length > 0
+            ? { entryCode: { contains: input.entryCodeQuery.trim(), mode: "insensitive" as const } }
+            : {};
 
-        const where = { activationId: input.activationId, ...statusWhere, ...consentWhere };
+        const where = {
+          activationId: input.activationId,
+          ...statusWhere,
+          ...consentWhere,
+          ...entryCodeWhere,
+        };
 
         const [rows, total] = await Promise.all([
           prisma.registration.findMany({
             where,
             orderBy: { registeredAt: "desc" },
-            take: input.take + 1,
-            ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+            take: input.pageSize,
+            skip: (input.page - 1) * input.pageSize,
             select: {
               id: true,
               email: true,
@@ -198,6 +220,7 @@ export const registrationRouter = router({
               registeredAt: true,
               verifiedAt: true,
               boothCode: true,
+              entryCode: true,
               utmSource: true,
               utmMedium: true,
               utmCampaign: true,
@@ -213,13 +236,13 @@ export const registrationRouter = router({
           prisma.registration.count({ where }),
         ]);
 
-        let nextCursor: string | null = null;
-        if (rows.length > input.take) {
-          const extra = rows.pop();
-          nextCursor = extra!.id;
-        }
-
-        return { items: rows, nextCursor, total };
+        return {
+          items: rows,
+          total,
+          page: input.page,
+          pageSize: input.pageSize,
+          totalPages: Math.max(1, Math.ceil(total / input.pageSize)),
+        };
       }
     ),
 
