@@ -3,7 +3,11 @@ import { router } from "../init";
 import { memberProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
-import type { RegistrationStatus, MrqAccountStatus } from "@prisma/client";
+import type {
+  RegistrationStatus,
+  MrqAccountStatus,
+  SelectionType,
+} from "@prisma/client";
 
 interface RegistrationRow {
   id: string;
@@ -24,6 +28,19 @@ interface RegistrationRow {
   mrqEnrichedAt: Date | null;
   mrqContactConsent: boolean;
   consentItemsAccepted: unknown;
+  /** Admin-set flag excluding this registration from future winner draws.
+   *  Surfaces as a 🚫 indicator on the registrations table per §1.6.D. */
+  excluded: boolean;
+  /** Most recent non-disqualified winner-draw selection for this registration
+   *  (across all draws on this activation), or null if none. Surfaces as a
+   *  trophy/star indicator per §1.6.D. The Selection model's @@unique
+   *  constraint on (activationId, registrationId) means there is at most one
+   *  such row, so "most recent" is unambiguous. */
+  winnerSelections: {
+    type: SelectionType;
+    position: number;
+    drawId: string;
+  }[];
 }
 
 const StatusFilterSchema = z
@@ -231,6 +248,22 @@ export const registrationRouter = router({
               mrqEnrichedAt: true,
               mrqContactConsent: true,
               consentItemsAccepted: true,
+              excluded: true,
+              // Most recent non-disqualified winner selection for this row.
+              // The @@unique([activationId, registrationId]) constraint means
+              // at most one such row exists per activation; we still take(1)
+              // defensively in case future schema changes loosen that
+              // constraint. Used to render the 🏆 trophy indicator on the
+              // registrations table.
+              winnerSelections: {
+                where: { status: { not: "DISQUALIFIED" } },
+                select: {
+                  type: true,
+                  position: true,
+                  drawId: true,
+                },
+                take: 1,
+              },
             },
           }),
           prisma.registration.count({ where }),

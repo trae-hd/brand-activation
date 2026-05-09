@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { AdminShell } from "@/components/shared/layouts/AdminShell";
 import { DashboardClient } from "@/components/admin/DashboardClient";
 import { RegistrationsTable } from "@/components/admin/RegistrationsTable";
+import { WinnersSection } from "@/components/admin/winner/WinnersSection";
 
 export default async function DashboardPage({
   params,
@@ -43,6 +44,10 @@ export default async function DashboardPage({
           consentItems={activation.consentItems}
           mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
           entryCodePrefix={activation.entryCodePrefix}
+        />
+        <WinnersSection
+          activationId={activation.id}
+          userRole={userRole}
         />
       </div>
     </AdminShell>

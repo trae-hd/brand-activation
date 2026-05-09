@@ -337,6 +337,9 @@ export function RegistrationsTable({
         <table className="w-full min-w-[900px] text-sm">
           <thead className="border-b bg-muted/40">
             <tr>
+              <th className="px-4 py-3 text-left font-medium w-10">
+                <span className="sr-only">State</span>
+              </th>
               <th className="px-4 py-3 text-left font-medium">Verified at</th>
               <th className="px-4 py-3 text-left font-medium">Email</th>
               {hasEntryCodes && (
@@ -369,7 +372,7 @@ export function RegistrationsTable({
             {visibleItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9 + consentColCount + (hasEntryCodes ? 1 : 0)}
+                  colSpan={10 + consentColCount + (hasEntryCodes ? 1 : 0)}
                   className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   {data ? "No registrations match." : "Loading…"}
@@ -378,8 +381,41 @@ export function RegistrationsTable({
             ) : (
               visibleItems.map((r) => {
                 const isRevealed = revealed.has(r.id);
+                const winnerSelection = r.winnerSelections[0];
                 return (
                   <tr key={r.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-1">
+                        {winnerSelection && (
+                          <span
+                            title={`${winnerSelection.type === "WINNER" ? "Winner" : "Reserve"} · position ${winnerSelection.position}`}
+                            aria-label={`${winnerSelection.type === "WINNER" ? "Winner" : "Reserve"} at position ${winnerSelection.position}`}
+                            className="text-amber-500"
+                          >
+                            <DynamicIcon
+                              name={
+                                winnerSelection.type === "WINNER"
+                                  ? "Trophy"
+                                  : "Star"
+                              }
+                              className="h-3.5 w-3.5"
+                            />
+                          </span>
+                        )}
+                        {r.excluded && (
+                          <span
+                            title="Excluded from winner draws"
+                            aria-label="Excluded from winner draws"
+                            className="text-muted-foreground"
+                          >
+                            <DynamicIcon
+                              name="Ban"
+                              className="h-3.5 w-3.5"
+                            />
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5 tabular-nums text-muted-foreground">
                       {fmtTime(r.verifiedAt)}
                     </td>
