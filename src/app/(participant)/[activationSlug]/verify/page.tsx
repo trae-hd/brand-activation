@@ -23,15 +23,28 @@ export default function VerifyPage() {
     activationId: string | null;
     email: string | null;
     consentVersion: string | null;
+    mrqContactConsent: boolean;
   }>(() => {
     if (typeof window === "undefined") {
-      return { token: null, activationId: null, email: null, consentVersion: null };
+      return {
+        token: null,
+        activationId: null,
+        email: null,
+        consentVersion: null,
+        mrqContactConsent: false,
+      };
     }
     return {
       token: sessionStorage.getItem(`mrq:pendingToken:${activationSlug}`),
       activationId: sessionStorage.getItem(`mrq:activationId:${activationSlug}`),
       email: sessionStorage.getItem(`mrq:email:${activationSlug}`),
       consentVersion: sessionStorage.getItem(`mrq:consentVersion:${activationSlug}`),
+      // Stored as "1"/"0" by RegistrationForm on submit. Default to false if
+      // missing (older sessions, direct navigation) — the API only uses this
+      // value when creating a new Registration row, and the upsert in
+      // /api/register no-ops on resend, so a wrong default here is harmless.
+      mrqContactConsent:
+        sessionStorage.getItem(`mrq:mrqContactConsent:${activationSlug}`) === "1",
     };
   });
 
@@ -125,22 +138,34 @@ export default function VerifyPage() {
   };
 
   const handleResend = async () => {
-    const { activationId, email, consentVersion } = session;
+    const { activationId, email, consentVersion, mrqContactConsent } = session;
     if (isResending || !activationId || !email || !consentVersion) return;
     setIsResending(true);
+    setError(null);
     try {
       const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ activationId, email, consentVersion }),
+        // mrqContactConsent is required by the API's Zod schema on every call.
+        // Replay the value the participant gave at initial registration; the
+        // upsert in /api/register no-ops the existing row's consent, so this
+        // doesn't overwrite anything in the DB.
+        body: JSON.stringify({ activationId, email, consentVersion, mrqContactConsent }),
       });
-      if (res.ok) {
-        const { pendingToken } = (await res.json()) as { pendingToken: string };
-        sessionStorage.setItem(`mrq:pendingToken:${activationSlug}`, pendingToken);
-        setSecondsLeft(OTP_TTL_SECONDS);
-        setOtp("");
-        setError(null);
+      if (res.status === 429) {
+        setError("Too many resends. Please wait a minute and try again.");
+        return;
       }
+      if (!res.ok) {
+        setError("Couldn't resend. Please try again.");
+        return;
+      }
+      const { pendingToken } = (await res.json()) as { pendingToken: string };
+      sessionStorage.setItem(`mrq:pendingToken:${activationSlug}`, pendingToken);
+      setSecondsLeft(OTP_TTL_SECONDS);
+      setOtp("");
+    } catch {
+      setError("Network error. Please try again.");
     } finally {
       setIsResending(false);
     }

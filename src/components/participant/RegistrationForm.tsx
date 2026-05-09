@@ -102,6 +102,12 @@ export function RegistrationForm(props: Props) {
         sessionStorage.setItem(`mrq:email:${props.activationSlug}`, email);
         sessionStorage.setItem(`mrq:activationId:${props.activationSlug}`, props.activationId);
         sessionStorage.setItem(`mrq:consentVersion:${props.activationSlug}`, props.consentVersion);
+        // Stored so /verify can replay it on resend — /api/register's Zod
+        // schema requires mrqContactConsent on every call.
+        sessionStorage.setItem(
+          `mrq:mrqContactConsent:${props.activationSlug}`,
+          mrqContactConsent ? "1" : "0",
+        );
         router.push(`/${props.activationSlug}/verify`);
       } catch {
         setError("Network error. Please try again.");

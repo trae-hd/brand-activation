@@ -457,6 +457,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
               content={registration.content}
               consentNotice={registration.consentNotice}
               consentItems={registration.consentItems}
+              mrqContactConsentEnabled={registration.mrqContactConsentEnabled}
               ctaText={registration.ctaText}
               termsContent={registration.termsContent}
               primaryColor={primaryColor}
@@ -495,6 +496,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         content={registration.content}
         consentNotice={registration.consentNotice}
         consentItems={registration.consentItems}
+        mrqContactConsentEnabled={registration.mrqContactConsentEnabled}
         ctaText={registration.ctaText}
         termsContent={registration.termsContent}
         successHeading={success.successHeading}

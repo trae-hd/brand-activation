@@ -24,10 +24,18 @@ export function ExpiredResendForm({
     setError(null);
     startTransition(async () => {
       try {
+        // Replay the participant's original mrqContactConsent answer if we
+        // have it in this tab's session — required by the API's Zod schema.
+        // If the participant landed here via direct navigation (no prior
+        // registration in this tab), default to false; the upsert no-ops on
+        // existing rows so this can't overwrite their original answer.
+        const mrqContactConsent =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem(`mrq:mrqContactConsent:${activationSlug}`) === "1";
         const res = await fetch("/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activationId, email, consentVersion }),
+          body: JSON.stringify({ activationId, email, consentVersion, mrqContactConsent }),
         });
         if (res.status === 503) {
           setError("Service is briefly unavailable. Please try again in a moment.");

@@ -30,6 +30,7 @@ interface Props {
   content: unknown;
   consentNotice: unknown;
   consentItems: ConsentItem[];
+  mrqContactConsentEnabled: boolean;
   ctaText: string;
   termsContent: unknown;
   primaryColor: string;
@@ -49,6 +50,7 @@ export function ActivationReviewDiff({
   content,
   consentNotice,
   consentItems,
+  mrqContactConsentEnabled,
   ctaText,
   termsContent,
   primaryColor,
@@ -68,6 +70,12 @@ export function ActivationReviewDiff({
   const snapshotCtaText = String(snapshot.ctaText ?? "");
   const snapshotTermsContent = snapshot.termsContent ?? null;
   const snapshotPrimaryColor = String(snapshot.primaryColor ?? "");
+  // Snapshot's mrqContactConsentEnabled — read defensively because activations
+  // approved before this field existed won't have it on their snapshot.
+  const snapshotMrqContactConsentEnabled =
+    typeof snapshot.mrqContactConsentEnabled === "boolean"
+      ? snapshot.mrqContactConsentEnabled
+      : false;
 
   return (
     <div className="flex flex-col gap-4">
@@ -87,6 +95,7 @@ export function ActivationReviewDiff({
               content={snapshotContent}
               consentNotice={snapshotConsentNotice}
               consentItems={snapshotConsentItems}
+              mrqContactConsentEnabled={snapshotMrqContactConsentEnabled}
               ctaText={snapshotCtaText}
               termsContent={snapshotTermsContent}
               primaryColor={snapshotPrimaryColor}
@@ -107,6 +116,7 @@ export function ActivationReviewDiff({
               content={content}
               consentNotice={consentNotice}
               consentItems={consentItems}
+              mrqContactConsentEnabled={mrqContactConsentEnabled}
               ctaText={ctaText}
               termsContent={termsContent}
               primaryColor={primaryColor}

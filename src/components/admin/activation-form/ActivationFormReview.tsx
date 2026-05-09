@@ -37,6 +37,7 @@ interface Props {
   content: unknown;
   consentNotice: unknown;
   consentItems: ConsentItem[];
+  mrqContactConsentEnabled: boolean;
   ctaText: string;
   termsContent: unknown;
   primaryColor: string;
@@ -78,6 +79,7 @@ export function ActivationFormReview({
   content,
   consentNotice,
   consentItems,
+  mrqContactConsentEnabled,
   ctaText,
   termsContent,
   primaryColor,
@@ -230,6 +232,7 @@ export function ActivationFormReview({
               content={content}
               consentNotice={consentNotice}
               consentItems={consentItems}
+              mrqContactConsentEnabled={mrqContactConsentEnabled}
               ctaText={ctaText}
               termsContent={termsContent}
               primaryColor={primaryColor}

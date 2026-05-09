@@ -58,6 +58,10 @@ interface Props {
   content: unknown;
   consentNotice: unknown;
   consentItems: ConsentItem[];
+  /** When true, the registration form renders an extra "I agree to be
+   *  contacted by MrQ if I am selected as a winner" checkbox below the
+   *  configured consent items. The preview should mirror that. */
+  mrqContactConsentEnabled?: boolean;
   ctaText: string;
   termsContent: unknown;
   primaryColor: string;
@@ -90,6 +94,7 @@ export function ActivationPreview({
   content,
   consentNotice,
   consentItems,
+  mrqContactConsentEnabled = false,
   ctaText,
   termsContent,
   primaryColor,
@@ -135,6 +140,7 @@ export function ActivationPreview({
     previewBody,
     consentNotice,
     consentItems,
+    mrqContactConsentEnabled,
     ctaLabel,
     btnClass,
     btnStyle,
@@ -205,6 +211,7 @@ export function ActivationPreview({
           previewBody={previewBody}
           consentNotice={consentNotice}
           consentItems={consentItems}
+          mrqContactConsentEnabled={mrqContactConsentEnabled}
           ctaLabel={ctaLabel}
           btnClass={btnClass}
           btnStyle={btnStyle}
@@ -246,6 +253,7 @@ interface PreviewBodyProps {
   previewBody: string;
   consentNotice: unknown;
   consentItems: ConsentItem[];
+  mrqContactConsentEnabled: boolean;
   ctaLabel: string;
   btnClass: string;
   btnStyle: React.CSSProperties;
@@ -261,6 +269,7 @@ function MobilePreview({
   previewBody,
   consentNotice,
   consentItems,
+  mrqContactConsentEnabled,
   ctaLabel,
   btnClass,
   btnStyle,
@@ -294,7 +303,11 @@ function MobilePreview({
               {consentNoticeText}
             </p>
           )}
-          <ConsentPreview consentItems={consentItems} size="mobile" />
+          <ConsentPreview
+            consentItems={consentItems}
+            mrqContactConsentEnabled={mrqContactConsentEnabled}
+            size="mobile"
+          />
           <div
             className={cn("rounded py-1 text-center text-[10px] font-medium", btnClass)}
             style={btnStyle}
@@ -327,6 +340,7 @@ function DesktopPreview({
   previewBody,
   consentNotice,
   consentItems,
+  mrqContactConsentEnabled,
   ctaLabel,
   btnClass,
   btnStyle,
@@ -365,7 +379,11 @@ function DesktopPreview({
             {consentNoticeText}
           </p>
         )}
-        <ConsentPreview consentItems={consentItems} size="desktop" />
+        <ConsentPreview
+          consentItems={consentItems}
+          mrqContactConsentEnabled={mrqContactConsentEnabled}
+          size="desktop"
+        />
         <div
           className={cn("rounded py-1.5 text-center text-xs font-medium", btnClass)}
           style={btnStyle}
@@ -509,14 +527,30 @@ function HeroImage({ url, size }: { url: string; size: "mobile" | "desktop" }) {
 
 function ConsentPreview({
   consentItems,
+  mrqContactConsentEnabled,
   size,
 }: {
   consentItems: ConsentItem[];
+  mrqContactConsentEnabled: boolean;
   size: "mobile" | "desktop";
 }) {
   const checkSize = size === "mobile" ? "h-3 w-3" : "h-3.5 w-3.5";
   const textSize = size === "mobile" ? "text-[9px]" : "text-xs";
   const gap = size === "mobile" ? "gap-1" : "gap-1.5";
+
+  // The MrQ-winner-contact checkbox sits below the configured items in the
+  // live form (see RegistrationForm). The preview mirrors that ordering so
+  // admins can see exactly what the participant will see when the toggle is
+  // on. We slice the regular items to 3 for visual compactness, but the MrQ
+  // row always renders on top of that when enabled.
+  const mrqRow = mrqContactConsentEnabled ? (
+    <div className="flex items-start gap-1.5">
+      <div className={cn("border-foreground/30 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
+      <p className={cn("text-muted-foreground line-clamp-1 leading-tight", textSize)}>
+        I agree to be contacted by MrQ if I am selected as a winner.
+      </p>
+    </div>
+  ) : null;
 
   if (consentItems.length > 0) {
     return (
@@ -530,13 +564,17 @@ function ConsentPreview({
             </p>
           </div>
         ))}
+        {mrqRow}
       </div>
     );
   }
   return (
-    <div className="flex items-start gap-1.5">
-      <div className={cn("border-muted-foreground/20 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
-      <p className={cn("text-muted-foreground/40 leading-tight", textSize)}>No consent items added</p>
+    <div className={cn("flex flex-col", gap)}>
+      <div className="flex items-start gap-1.5">
+        <div className={cn("border-muted-foreground/20 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
+        <p className={cn("text-muted-foreground/40 leading-tight", textSize)}>No consent items added</p>
+      </div>
+      {mrqRow}
     </div>
   );
 }
