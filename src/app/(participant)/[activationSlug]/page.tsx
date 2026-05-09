@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { verifyPreviewToken } from "@/lib/preview/token";
 import { RegistrationForm } from "@/components/participant/RegistrationForm";
-import { NotifyMeForm } from "@/components/participant/NotifyMeForm";
 import { TermsAccordion } from "@/components/participant/TermsAccordion";
 
 const getActivation = (slug: string) =>
@@ -98,11 +97,9 @@ export default async function LandingPage({
           <h1 className="text-xl font-bold leading-snug mb-2">
             Doors aren&apos;t open yet.
           </h1>
-          <p className="text-sm text-ink-3 mb-3">
-            Pop back at {time} — or drop your email and we&apos;ll text you the
-            moment it opens.
+          <p className="text-sm text-ink-3">
+            Pop back at {time} when doors open.
           </p>
-          <NotifyMeForm />
         </div>
       </main>
     );
