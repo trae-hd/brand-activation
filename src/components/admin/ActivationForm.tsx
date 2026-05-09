@@ -80,7 +80,13 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
   const [endsAt, setEndsAt] = useState(
     initialData ? toDatetimeLocal(new Date(initialData.endsAt)) : "",
   );
-  const [primaryColor, setPrimaryColor] = useState(initialData?.primaryColor ?? "");
+  // Default new activations to the MrQ brand blue. Existing activations
+  // keep whatever's in the DB (including null/empty for ones created before
+  // this default landed) — we don't want to silently overwrite a colour the
+  // creator deliberately left blank.
+  const [primaryColor, setPrimaryColor] = useState(
+    initialData?.primaryColor ?? (mode === "create" ? "#0a2ecb" : ""),
+  );
   const [timezone, setTimezone] = useState(initialData?.timezone ?? "Europe/London");
   const [entryCodePrefix, setEntryCodePrefix] = useState(initialData?.entryCodePrefix ?? "");
   const [booths, setBooths] = useState<BoothRow[]>(initialData?.booths ?? []);
