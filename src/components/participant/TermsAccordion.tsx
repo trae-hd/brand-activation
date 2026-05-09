@@ -42,20 +42,20 @@ function renderNode(node: unknown, key: number): React.ReactNode {
       const text = flatText(n.content ?? []);
       if (!text.trim()) return null;
       return (
-        <p key={key} className="text-xs leading-relaxed">
+        <p key={key} className="text-xs leading-relaxed break-words">
           {renderInline(n.content ?? [])}
         </p>
       );
     }
     case "bulletList":
       return (
-        <ul key={key} className="list-disc list-inside text-xs space-y-0.5">
+        <ul key={key} className="list-disc list-inside text-xs space-y-0.5 break-words">
           {(n.content ?? []).map((c, i) => renderNode(c, i))}
         </ul>
       );
     case "orderedList":
       return (
-        <ol key={key} className="list-decimal list-inside text-xs space-y-0.5">
+        <ol key={key} className="list-decimal list-inside text-xs space-y-0.5 break-words">
           {(n.content ?? []).map((c, i) => renderNode(c, i))}
         </ol>
       );
@@ -113,7 +113,7 @@ export function TermsAccordion({ content }: TermsAccordionProps) {
         </span>
       </button>
       {open && (
-        <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-ink-3 space-y-2">
+        <div className="mt-3 rounded-md border border-border bg-muted/30 p-3 text-ink-3 space-y-2 max-w-full overflow-x-auto">
           {(root.content ?? []).map((node, i) => renderNode(node, i))}
         </div>
       )}

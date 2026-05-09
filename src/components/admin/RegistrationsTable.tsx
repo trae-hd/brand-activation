@@ -35,16 +35,6 @@ function maskEmail(email: string): string {
   return `${email[0]}***${email.slice(at)}`;
 }
 
-function fmtTime(d: Date | null): string {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/London",
-    hour12: false,
-  }).format(new Date(d));
-}
-
 function fmtDate(d: Date | string | null): string {
   if (!d) return "—";
   return new Intl.DateTimeFormat("en-GB", {
@@ -430,8 +420,8 @@ export function RegistrationsTable({
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums text-muted-foreground">
-                      {fmtTime(r.verifiedAt)}
+                    <td className="px-4 py-2.5 tabular-nums text-muted-foreground whitespace-nowrap">
+                      {fmtDate(r.verifiedAt)}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs">
                       {isRevealed ? r.email : maskEmail(r.email)}

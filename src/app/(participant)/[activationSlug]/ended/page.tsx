@@ -1,6 +1,6 @@
 export default function EndedPage() {
   return (
-    <main className="mx-auto max-w-sm px-5 pt-5 pb-8 min-h-screen">
+    <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
       <div className="mb-5 text-sm font-semibold tracking-tight">
         MrQ <span className="font-normal text-ink-3">live</span>
       </div>

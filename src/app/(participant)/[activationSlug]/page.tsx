@@ -87,12 +87,12 @@ export default async function LandingPage({
   if (activation.status === "SCHEDULED") {
     const { label, time } = formatLondonDateTime(activation.startsAt);
     return (
-      <main className="mx-auto max-w-sm px-5 pt-5 pb-8 min-h-screen">
+      <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
         <div className="text-sm font-semibold tracking-tight mb-5">
           MrQ <span className="font-normal text-ink-3">live</span>
         </div>
         <div className="rounded-md border border-border p-4">
-          <p className="text-xs font-bold tracking-widest uppercase text-primary mb-1">
+          <p className="text-xs font-bold tracking-widest uppercase text-primary mb-1 break-words">
             OPENS · {label}
           </p>
           <h1 className="text-xl font-bold leading-snug mb-2">
@@ -109,7 +109,7 @@ export default async function LandingPage({
   }
 
   return (
-    <main className="mx-auto max-w-sm px-5 pt-5 pb-8 min-h-screen">
+    <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold tracking-tight">
           MrQ <span className="font-normal text-ink-3">live</span>
@@ -129,7 +129,7 @@ export default async function LandingPage({
           />
         </div>
       )}
-      <h1 className="text-2xl font-bold leading-tight mb-2">{activation.name}</h1>
+      <h1 className="text-2xl font-bold leading-tight mb-2 break-words">{activation.name}</h1>
       <p className="text-sm text-ink-3 mb-4">
         Pop your email in. We&apos;ll send a code.
       </p>

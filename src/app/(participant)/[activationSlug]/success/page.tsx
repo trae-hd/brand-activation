@@ -104,7 +104,7 @@ export default async function SuccessPage({
   const hasSponsor = !!(sponsorHeadline || sponsorBody || sponsorLogoUrl);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center px-5 pb-8 pt-10">
+    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col items-center px-5 pb-8 pt-10">
       {/* Header */}
       <div className="flex w-full items-center justify-between mb-8">
         <span className="text-sm font-bold tracking-tight">
@@ -117,9 +117,9 @@ export default async function SuccessPage({
 
       {/* Confirmation heading */}
       <div className="w-full space-y-2">
-        <h1 className="text-3xl font-bold">{heading}</h1>
+        <h1 className="text-3xl font-bold break-words">{heading}</h1>
         {subheading && (
-          <p className="text-sm text-muted-foreground">{subheading}</p>
+          <p className="text-sm text-muted-foreground break-words">{subheading}</p>
         )}
       </div>
 
@@ -127,7 +127,7 @@ export default async function SuccessPage({
       {contentLines.length > 0 && (
         <div className="mt-4 w-full space-y-2">
           {contentLines.map((line, i) => (
-            <p key={i} className="text-sm text-muted-foreground">{line}</p>
+            <p key={i} className="text-sm text-muted-foreground break-words">{line}</p>
           ))}
         </div>
       )}
@@ -167,22 +167,22 @@ export default async function SuccessPage({
                 alt={sponsorLogoAlt}
                 width={120}
                 height={40}
-                className="object-contain"
+                className="h-auto max-w-full object-contain"
                 unoptimized
               />
             )}
             {sponsorHeadline && (
-              <p className="text-base font-semibold leading-snug">{sponsorHeadline}</p>
+              <p className="text-base font-semibold leading-snug break-words">{sponsorHeadline}</p>
             )}
             {sponsorBody && (
-              <p className="text-sm text-muted-foreground">{sponsorBody}</p>
+              <p className="text-sm text-muted-foreground break-words">{sponsorBody}</p>
             )}
             {sponsorCtaLabel && (
               <a
                 href={sponsorCtaUrl ?? "#"}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground break-words"
               >
                 {sponsorCtaLabel} →
               </a>

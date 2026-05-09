@@ -151,7 +151,7 @@ export function RegistrationForm(props: Props) {
               />
               <label
                 htmlFor={`reg-consent-${i}`}
-                className="text-sm leading-snug"
+                className="text-sm leading-snug break-words min-w-0"
               >
                 {item.text}
                 {item.required && (

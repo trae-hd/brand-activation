@@ -147,7 +147,7 @@ export default function VerifyPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col px-5 pb-8 pt-8">
+    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col px-5 pb-8 pt-8">
       {offline && (
         <div className="mb-4 rounded-md border border-warn/40 bg-warn/5 px-3 py-2 text-sm text-ink-3">
           You appear to be offline — your code will be submitted when you reconnect.
