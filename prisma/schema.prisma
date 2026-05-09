@@ -45,6 +45,19 @@ enum MrqAccountStatus {
   NOT_FOUND
 }
 
+enum SelectionType {
+  WINNER
+  RESERVE
+}
+
+enum SelectionStatus {
+  SELECTED
+  DISQUALIFIED
+  NOTIFIED
+  DECLINED
+  CONFIRMED
+}
+
 model WorkspaceSettings {
   id                  String     @id @default("workspace")
   workspaceName       String     @default("MrQ Live")
@@ -67,30 +80,30 @@ model EmailSuppression {
 }
 
 model Activation {
-  id        String           @id @default(cuid())
-  slug      String           @unique
-  name      String
-  status    ActivationStatus @default(DRAFT)
+  id     String           @id @default(cuid())
+  slug   String           @unique
+  name   String
+  status ActivationStatus @default(DRAFT)
 
   startsAt DateTime
   endsAt   DateTime
 
-  timezone        String  @default("Europe/London")
+  timezone        String    @default("Europe/London")
   archivedAt      DateTime?
   entryCodePrefix String?
 
   /// Tiptap ProseMirror tree for the landing page (loose allowlist — see §9.2).
-  content Json
+  content        Json
   /// Tiptap ProseMirror tree for the consent / privacy notice (tight allowlist — see §9.2).
-  consentNotice Json
+  consentNotice  Json
   /// SHA-256 of the canonicalised consentNotice JSON. Recomputed on every save.
   consentVersion String
   /// Tiptap ProseMirror tree for the T&Cs accordion shown at the bottom of the participant form.
-  termsContent Json?
+  termsContent   Json?
   /// JSON array of consent checkbox items: [{text: string}]. Shown as individual checkboxes on the registration form.
-  consentItems Json?
+  consentItems   Json?
   /// Optional CTA button label for the registration form (e.g. "Send me a code").
-  ctaText String?
+  ctaText        String?
 
   /// Optional hex colour for the landing page primary accent (e.g. "#FF3366").
   primaryColor String?
@@ -99,14 +112,14 @@ model Activation {
   heroImageAlt String?
 
   // ── Success page fields ──
-  successHeading        String?
-  successSubheading     String?
-  successContent        Json?
-  successCtaLabel       String?
-  successCtaUrl         String?
-  successShowEntryCode  Boolean @default(true)
-  successShowResend     Boolean @default(true)
-  successShowCta        Boolean @default(true)
+  successHeading       String?
+  successSubheading    String?
+  successContent       Json?
+  successCtaLabel      String?
+  successCtaUrl        String?
+  successShowEntryCode Boolean @default(true)
+  successShowResend    Boolean @default(true)
+  successShowCta       Boolean @default(true)
 
   // ── Sponsor block (shown at bottom of success page; omitted when all null) ──
   successSponsorName     String?
@@ -141,8 +154,10 @@ model Activation {
   createdById String
   updatedAt   DateTime  @updatedAt
 
-  registrations Registration[]
-  booths        Booth[]
+  registrations    Registration[]
+  booths           Booth[]
+  winnerDraws      WinnerDraw[]
+  winnerSelections WinnerDrawSelection[]
 
   @@index([status, startsAt])
   @@index([slug])
@@ -170,10 +185,10 @@ model Registration {
   /// HMAC-SHA256(email_lowercased) using EMAIL_HASH_HMAC_KEY (non-rotating).
   emailHash String
 
-  status    RegistrationStatus @default(PENDING)
-  boothCode String?
-  utmSource String?
-  utmMedium String?
+  status      RegistrationStatus @default(PENDING)
+  boothCode   String?
+  utmSource   String?
+  utmMedium   String?
   utmCampaign String?
 
   ipHash        String
@@ -199,9 +214,18 @@ model Registration {
   mrqEnrichedAt    DateTime?
 
   /// Whether the participant consented to being contacted by MrQ if they win. Mandatory on all activations.
-  mrqContactConsent Boolean @default(false)
+  mrqContactConsent    Boolean @default(false)
   /// Snapshot of each configurable consent checkbox shown at registration time: [{text, accepted}].
   consentItemsAccepted Json?
+
+  /// Admin-set flag excluding this registration from future winner draws.
+  /// No UI in v1 — set via direct DB / Prisma Studio. Eligibility filter in
+  /// the winner-picking shuffle respects this.
+  excluded Boolean @default(false)
+
+  // ── Winner-picking back-relations ──
+  winnerSelections  WinnerDrawSelection[]
+  winnerPoolEntries WinnerDrawPoolEntry[]
 
   @@unique([activationId, emailHash])
   @@unique([activationId, entryCode])
@@ -228,11 +252,11 @@ model AuditLog {
 }
 
 model AdminUser {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  name         String
-  role         AdminRole
-  active       Boolean   @default(true)
+  id     String    @id @default(cuid())
+  email  String    @unique
+  name   String
+  role   AdminRole
+  active Boolean   @default(true)
 
   /// bcrypt hash, cost 12. Null until invite is consumed or Google SSO links the row.
   passwordHash String?
@@ -240,15 +264,21 @@ model AdminUser {
   createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
 
-  activationsCreated          Activation[]         @relation("ActivationCreator")
-  activationsReviewSubmitted  Activation[]         @relation("ReviewSubmitter")
-  activationsReviewApproved   Activation[]         @relation("ReviewApprover")
-  auditLogsAuthored           AuditLog[]           @relation("AuditActor")
-  invitesIssued            AdminInvite[]       @relation("InviteIssuer")
-  invitesReceived          AdminInvite[]       @relation("InviteSubject")
-  passwordResetsIssued     PasswordResetToken[] @relation("ResetIssuer")
-  passwordResetsReceived   PasswordResetToken[] @relation("ResetSubject")
-  workspaceSettingsUpdated WorkspaceSettings[]
+  activationsCreated         Activation[]         @relation("ActivationCreator")
+  activationsReviewSubmitted Activation[]         @relation("ReviewSubmitter")
+  activationsReviewApproved  Activation[]         @relation("ReviewApprover")
+  auditLogsAuthored          AuditLog[]           @relation("AuditActor")
+  invitesIssued              AdminInvite[]        @relation("InviteIssuer")
+  invitesReceived            AdminInvite[]        @relation("InviteSubject")
+  passwordResetsIssued       PasswordResetToken[] @relation("ResetIssuer")
+  passwordResetsReceived     PasswordResetToken[] @relation("ResetSubject")
+  workspaceSettingsUpdated   WorkspaceSettings[]
+
+  // ── Winner-picking back-relations ──
+  winnerDrawsRun      WinnerDraw[]          @relation("DrawnBy")
+  disqualifications   WinnerDrawSelection[] @relation("DisqualifiedBy")
+  winnerNotifications WinnerDrawSelection[] @relation("NotifiedBy")
+  winnerNotesUpdates  WinnerDrawSelection[] @relation("NotesUpdatedBy")
 
   @@index([role, active])
 }
@@ -291,4 +321,103 @@ model PasswordResetToken {
 
   @@index([subjectId, consumedAt])
   @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Winner picking
+//
+// Three tables capture the winner-picking lifecycle. Algorithm + audit trail
+// documented in src/resource/MRQ_LIVE_ACTIVATION_WINNER_PICKING_PROMPT.md.
+// Migration enables the pgcrypto Postgres extension so the deterministic
+// SHA-256 shuffle can run server-side.
+//
+// Erasure: WinnerDrawSelection.registrationId and WinnerDrawPoolEntry.registrationId
+// use onDelete: SetNull so participant erasure preserves the audit trail (the
+// position in the shuffle remains, the identity link is broken).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model WinnerDraw {
+  id                  String     @id @default(cuid())
+  activation          Activation @relation(fields: [activationId], references: [id], onDelete: Restrict)
+  activationId        String
+  drawnBy             AdminUser  @relation("DrawnBy", fields: [drawnById], references: [id], onDelete: Restrict)
+  drawnById           String
+  drawnAt             DateTime   @default(now())
+  /// Snapshot cutoff — registrations with verifiedAt > this timestamp were ineligible at draw time.
+  eligibilityCutoffAt DateTime
+  winnerCount         Int
+  reserveCount        Int
+  /// True if the draw was filtered to only registrations with mrqAccountStatus = ACTIVE.
+  mrqAccountOnly      Boolean    @default(false)
+  /// Pool size used for verification + the modal's pre-commit preview.
+  eligiblePoolSize    Int
+  /// Hex-encoded 32 bytes from crypto.randomBytes — the source of randomness for the shuffle.
+  seed                String
+  /// Stamped on every draw so future algorithm changes can be detected and re-derivation logic switched.
+  algorithmVersion    String     @default("v1:sha256-postgres-orderby")
+  notes               String?
+
+  selections  WinnerDrawSelection[]
+  poolEntries WinnerDrawPoolEntry[]
+
+  @@index([activationId, drawnAt])
+}
+
+model WinnerDrawSelection {
+  id             String          @id @default(cuid())
+  draw           WinnerDraw      @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  drawId         String
+  /// Nullable so participant erasure can null this column (onDelete: SetNull) without breaking the audit trail.
+  registration   Registration?   @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  registrationId String?
+  /// Denormalised so @@unique([activationId, registrationId]) can enforce "one selection per registration per activation across all draws".
+  activation     Activation      @relation(fields: [activationId], references: [id], onDelete: Cascade)
+  activationId   String
+  /// 1..(winnerCount + reserveCount); positions 1..winnerCount are winners, the rest reserves.
+  position       Int
+  type           SelectionType
+  status         SelectionStatus @default(SELECTED)
+
+  // Disqualification metadata — only populated when status = DISQUALIFIED.
+  disqualifiedAt     DateTime?
+  disqualifiedBy     AdminUser? @relation("DisqualifiedBy", fields: [disqualifiedById], references: [id], onDelete: SetNull)
+  disqualifiedById   String?
+  disqualifiedReason String?
+
+  // Promotion metadata — set when a reserve is promoted to a winner via the disqualify-and-promote flow.
+  promotedFromReserveAt DateTime?
+
+  // Notification metadata — set when an admin marks the selection as notified.
+  notifiedAt        DateTime?
+  notifiedBy        AdminUser? @relation("NotifiedBy", fields: [notifiedById], references: [id], onDelete: SetNull)
+  notifiedById      String?
+  notificationNotes String?
+
+  // Notes-edit metadata — tracked separately from notifiedById so "who first
+  // marked notified" and "who last edited the notes" are both auditable.
+  notesUpdatedAt   DateTime?
+  notesUpdatedBy   AdminUser? @relation("NotesUpdatedBy", fields: [notesUpdatedById], references: [id], onDelete: SetNull)
+  notesUpdatedById String?
+
+  /// One selection per (draw, registration). Catches insert-time races even if the SELECT-stage filter misses.
+  @@unique([drawId, registrationId])
+  /// One selection per registration across ALL draws on this activation. Disqualification does not free a slot
+  /// — once a registration has been on a draw for an activation, it stays on it forever (compliance: prevents
+  /// "redrawing until a preferred outcome").
+  @@unique([activationId, registrationId])
+  @@index([drawId, type])
+  @@index([drawId, position])
+}
+
+model WinnerDrawPoolEntry {
+  draw           WinnerDraw    @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  drawId         String
+  /// Sort position in the original eligible pool (1-based, ascending by registration id at draw time).
+  /// Permanent — survives erasure (registrationId nulls out, position stays).
+  position       Int
+  /// Nullable so participant erasure can null this column (onDelete: SetNull).
+  registration   Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  registrationId String?
+
+  @@id([drawId, position])
 }
