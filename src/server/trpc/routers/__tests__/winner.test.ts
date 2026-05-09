@@ -100,6 +100,7 @@ function stubTransaction() {
       winnerDrawSelection: {
         createMany: mockWinnerDrawSelectionCreateMany,
         findFirst: mockSelectionFindFirst,
+        findMany: mockSelectionFindMany,
         update: mockSelectionUpdate,
       },
       $executeRaw: mockExecuteRaw,
@@ -107,6 +108,42 @@ function stubTransaction() {
       auditLog: { create: vi.fn() },
     });
   });
+}
+
+/** Helper to produce a fake selection-with-includes shape, matching what
+ *  the SELECTION_INCLUDE constant in winner.ts produces. */
+function fakeSelection(
+  position: number,
+  type: "WINNER" | "RESERVE",
+): Record<string, unknown> {
+  return {
+    id: `sel-${position}`,
+    drawId: "draw-1",
+    activationId: "act-1",
+    registrationId: `reg-${position}`,
+    position,
+    type,
+    status: "SELECTED",
+    disqualifiedAt: null,
+    disqualifiedById: null,
+    disqualifiedReason: null,
+    promotedFromReserveAt: null,
+    notifiedAt: null,
+    notifiedById: null,
+    notificationNotes: null,
+    notesUpdatedAt: null,
+    notesUpdatedById: null,
+    registration: {
+      id: `reg-${position}`,
+      email: `pos${position}@example.com`,
+      emailHash: `hash-${position}`,
+      entryCode: `WC-${String(position).padStart(3, "0")}`,
+      mrqAccountStatus: "UNKNOWN",
+    },
+    disqualifiedBy: null,
+    notifiedBy: null,
+    notesUpdatedBy: null,
+  };
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────
@@ -235,6 +272,13 @@ describe("winner.pickWinners — happy path", () => {
       })),
     );
     mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 7 });
+    // Post-create findMany returns the just-inserted selections with the
+    // SELECTION_INCLUDE shape — used for the inline-return payload.
+    mockSelectionFindMany.mockResolvedValueOnce(
+      Array.from({ length: 7 }, (_, i) =>
+        fakeSelection(i + 1, i < 5 ? "WINNER" : "RESERVE"),
+      ),
+    );
 
     const caller = await makeWinnerCaller();
     const result = await caller.pickWinners({
@@ -286,6 +330,65 @@ describe("winner.pickWinners — happy path", () => {
     });
   });
 
+  it("returns selections inline with the SELECTION_INCLUDE shape (Option A — no follow-up fetch)", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1",
+      status: "ENDED",
+      endsAt: new Date(),
+    });
+    mockRegistrationCount.mockResolvedValueOnce(10);
+    mockWinnerDrawCreate.mockResolvedValueOnce({ id: "draw-1" });
+    mockExecuteRaw.mockResolvedValueOnce(10);
+    mockQueryRaw.mockResolvedValueOnce([
+      { id: "reg-1", pos: 1 },
+      { id: "reg-2", pos: 2 },
+      { id: "reg-3", pos: 3 },
+    ]);
+    mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 3 });
+    mockSelectionFindMany.mockResolvedValueOnce([
+      fakeSelection(1, "WINNER"),
+      fakeSelection(2, "WINNER"),
+      fakeSelection(3, "RESERVE"),
+    ]);
+
+    const caller = await makeWinnerCaller();
+    const result = await caller.pickWinners({
+      activationId: "act-1",
+      winnerCount: 2,
+      reserveCount: 1,
+      phrase: "DRAW",
+    });
+
+    // Selections are returned inline — no follow-up fetch required from
+    // the client. Confirms Option A is wired up end-to-end.
+    expect(result).toHaveProperty("selections");
+    expect(result.selections).toHaveLength(3);
+    expect(result.selections[0]).toMatchObject({
+      id: "sel-1",
+      position: 1,
+      type: "WINNER",
+      registration: { email: "pos1@example.com" },
+    });
+    expect(result.selections[2]).toMatchObject({
+      position: 3,
+      type: "RESERVE",
+    });
+
+    // Confirm the findMany used the same orderBy + include shape as
+    // listForActivation (the load-bearing "shared SELECTION_INCLUDE"
+    // contract).
+    expect(mockSelectionFindMany).toHaveBeenCalledTimes(1);
+    const findManyArg = mockSelectionFindMany.mock.calls[0][0];
+    expect(findManyArg.where).toEqual({ drawId: "draw-1" });
+    expect(findManyArg.orderBy).toEqual({ position: "asc" });
+    expect(findManyArg.include).toMatchObject({
+      registration: expect.any(Object),
+      disqualifiedBy: expect.any(Object),
+      notifiedBy: expect.any(Object),
+      notesUpdatedBy: expect.any(Object),
+    });
+  });
+
   it("does not return the seed in the response payload", async () => {
     mockActivationFindUnique.mockResolvedValueOnce({
       id: "act-1",
@@ -301,6 +404,11 @@ describe("winner.pickWinners — happy path", () => {
       { id: "reg-c", pos: 3 },
     ]);
     mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 3 });
+    mockSelectionFindMany.mockResolvedValueOnce([
+      fakeSelection(1, "WINNER"),
+      fakeSelection(2, "RESERVE"),
+      fakeSelection(3, "RESERVE"),
+    ]);
 
     const caller = await makeWinnerCaller();
     const result = await caller.pickWinners({
@@ -312,7 +420,7 @@ describe("winner.pickWinners — happy path", () => {
 
     expect(result).not.toHaveProperty("seed");
     expect(Object.keys(result).sort()).toEqual(
-      ["drawId", "drawnAt", "eligiblePoolSize", "reserveCount", "winnerCount"],
+      ["drawId", "drawnAt", "eligiblePoolSize", "reserveCount", "selections", "winnerCount"],
     );
   });
 
@@ -327,6 +435,7 @@ describe("winner.pickWinners — happy path", () => {
     mockExecuteRaw.mockResolvedValueOnce(5);
     mockQueryRaw.mockResolvedValueOnce([{ id: "reg-x", pos: 1 }]);
     mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 1 });
+    mockSelectionFindMany.mockResolvedValueOnce([fakeSelection(1, "WINNER")]);
 
     const caller = await makeWinnerCaller();
     await caller.pickWinners({
@@ -352,6 +461,7 @@ describe("winner.pickWinners — cutoff resolution", () => {
     mockExecuteRaw.mockResolvedValue(0);
     mockQueryRaw.mockResolvedValue([{ id: "reg-x", pos: 1 }]);
     mockWinnerDrawSelectionCreateMany.mockResolvedValue({ count: 1 });
+    mockSelectionFindMany.mockResolvedValue([fakeSelection(1, "WINNER")]);
   });
 
   it("defaults the cutoff to activation.endsAt when status is ENDED", async () => {

@@ -85,7 +85,14 @@ export function PickWinnersDialog({
   const [reserveCountTouched, setReserveCountTouched] = useState(false);
   const [mrqAccountOnly, setMrqAccountOnly] = useState(false);
   const [phrase, setPhrase] = useState("");
-  const [resultDrawId, setResultDrawId] = useState<string | null>(null);
+  // Inline result payload returned by pickWinners — avoids a separate fetch
+  // round-trip and guarantees the UI shows the success state atomically with
+  // the mutation's success.
+  const [resultData, setResultData] = useState<{
+    drawId: string;
+    drawnAt: Date | string;
+    selections: SelectionRow[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revealedSelectionIds, setRevealedSelectionIds] = useState<Set<string>>(
     new Set(),
@@ -111,7 +118,7 @@ export function PickWinnersDialog({
       setReserveCount(defaultReserves(1));
       setMrqAccountOnly(false);
       setPhrase("");
-      setResultDrawId(null);
+      setResultData(null);
       setError(null);
       setRevealedSelectionIds(new Set());
       setCopyState("idle");
@@ -128,13 +135,19 @@ export function PickWinnersDialog({
 
   // ── Mutations ─────────────────────────────────────────────────────
   const pickWinnersMutation = trpcReact.winner.pickWinners.useMutation({
-    onSuccess: async (data) => {
-      setResultDrawId(data.drawId);
+    onSuccess: (data) => {
+      // Selections come back inline — no second round-trip. The result
+      // state renders immediately from this payload.
+      setResultData({
+        drawId: data.drawId,
+        drawnAt: data.drawnAt,
+        selections: data.selections as unknown as SelectionRow[],
+      });
       setMode("result");
-      // Invalidate so the persistent Winners view (Phase 5) refreshes
-      // when the dialog closes — and so the result query below picks
-      // up the freshly-created selections.
-      await utils.winner.listForActivation.invalidate({ activationId });
+      // Invalidate so the persistent Winners view (Phase 5) shows the
+      // new draw on its next render. Fire-and-forget; we don't need to
+      // await it before showing the result.
+      void utils.winner.listForActivation.invalidate({ activationId });
     },
     onError: (err) => {
       setError(err.message);
@@ -145,18 +158,14 @@ export function PickWinnersDialog({
   const copyEmailsMutation = trpcReact.winner.copyEmails.useMutation();
   const revealEmailMutation = trpcReact.registration.revealEmail.useMutation();
 
-  // ── Result state — fetch the new draw + selections ────────────────
-  const drawsQuery = trpcReact.winner.listForActivation.useQuery(
-    { activationId },
-    { enabled: mode === "result" && resultDrawId !== null && open },
+  const winnerSelections = useMemo(
+    () => resultData?.selections.filter((s) => s.type === "WINNER") ?? [],
+    [resultData],
   );
-  const draw = useMemo(() => {
-    if (!drawsQuery.data || !resultDrawId) return null;
-    return drawsQuery.data.find((d) => d.id === resultDrawId) ?? null;
-  }, [drawsQuery.data, resultDrawId]);
-
-  const winnerSelections = draw?.selections.filter((s) => s.type === "WINNER") ?? [];
-  const reserveSelections = draw?.selections.filter((s) => s.type === "RESERVE") ?? [];
+  const reserveSelections = useMemo(
+    () => resultData?.selections.filter((s) => s.type === "RESERVE") ?? [],
+    [resultData],
+  );
 
   // ── Handlers ──────────────────────────────────────────────────────
   const handleSubmit = () => {
@@ -186,11 +195,11 @@ export function PickWinnersDialog({
   };
 
   const handleCopyEmails = async () => {
-    if (!resultDrawId) return;
+    if (!resultData) return;
     setCopyState("copying");
     try {
       const { emails } = await copyEmailsMutation.mutateAsync({
-        drawId: resultDrawId,
+        drawId: resultData.drawId,
       });
       await navigator.clipboard.writeText(emails.join("\n"));
       setCopyState("copied");
@@ -429,29 +438,21 @@ export function PickWinnersDialog({
             </DialogHeader>
 
             <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto py-2">
-              {drawsQuery.isLoading || !draw ? (
-                <p className="text-muted-foreground py-6 text-center text-sm">
-                  Loading selections…
-                </p>
-              ) : (
-                <>
-                  <SelectionTable
-                    title="Winners"
-                    selections={winnerSelections}
-                    revealedIds={revealedSelectionIds}
-                    onToggleReveal={handleReveal}
-                    revealPending={revealEmailMutation.isPending}
-                  />
-                  {reserveSelections.length > 0 && (
-                    <SelectionTable
-                      title="Reserves"
-                      selections={reserveSelections}
-                      revealedIds={revealedSelectionIds}
-                      onToggleReveal={handleReveal}
-                      revealPending={revealEmailMutation.isPending}
-                    />
-                  )}
-                </>
+              <SelectionTable
+                title="Winners"
+                selections={winnerSelections}
+                revealedIds={revealedSelectionIds}
+                onToggleReveal={handleReveal}
+                revealPending={revealEmailMutation.isPending}
+              />
+              {reserveSelections.length > 0 && (
+                <SelectionTable
+                  title="Reserves"
+                  selections={reserveSelections}
+                  revealedIds={revealedSelectionIds}
+                  onToggleReveal={handleReveal}
+                  revealPending={revealEmailMutation.isPending}
+                />
               )}
             </div>
 
@@ -460,7 +461,7 @@ export function PickWinnersDialog({
                 variant="outline"
                 size="sm"
                 onClick={handleCopyEmails}
-                disabled={copyState !== "idle" || !draw}
+                disabled={copyState !== "idle" || !resultData}
                 className="gap-1.5"
               >
                 <DynamicIcon
@@ -495,6 +496,7 @@ export function PickWinnersDialog({
 interface SelectionRow {
   id: string;
   position: number;
+  type: "WINNER" | "RESERVE";
   registration: {
     id: string;
     email: string;

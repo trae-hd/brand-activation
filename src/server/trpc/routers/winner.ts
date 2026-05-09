@@ -67,6 +67,35 @@ interface ShuffledRow {
   pos: number | bigint;
 }
 
+/**
+ * Shared `include` for selection rows. Used by `pickWinners` (returned
+ * inline so the result modal renders without a second round-trip) and
+ * `listForActivation` (the persistent Winners view in Phase 5). Sharing
+ * the shape via a single constant means UI components (SelectionTable,
+ * the email reveal pattern) consume identical data regardless of whether
+ * it came from the create-mutation response or the list-query response.
+ *
+ * Type sharing addresses the "decoupling" concern raised when picking
+ * Option A (inline return) over Option B (separate refetch): the inline
+ * payload doesn't lock us into one caller's needs because every caller
+ * uses the same shape. Future callers that don't need selections simply
+ * read the other fields and ignore this one.
+ */
+const SELECTION_INCLUDE = {
+  registration: {
+    select: {
+      id: true,
+      email: true,
+      emailHash: true,
+      entryCode: true,
+      mrqAccountStatus: true,
+    },
+  },
+  disqualifiedBy: { select: { id: true, name: true, email: true } },
+  notifiedBy: { select: { id: true, name: true, email: true } },
+  notesUpdatedBy: { select: { id: true, name: true, email: true } },
+} as const;
+
 export const winnerRouter = router({
   /**
    * Live preview of the eligible pool size — used by the Pick Winners modal
@@ -126,20 +155,7 @@ export const winnerRouter = router({
           drawnBy: { select: { id: true, name: true, email: true } },
           selections: {
             orderBy: { position: "asc" },
-            include: {
-              registration: {
-                select: {
-                  id: true,
-                  email: true,
-                  emailHash: true,
-                  entryCode: true,
-                  mrqAccountStatus: true,
-                },
-              },
-              disqualifiedBy: { select: { id: true, name: true, email: true } },
-              notifiedBy: { select: { id: true, name: true, email: true } },
-              notesUpdatedBy: { select: { id: true, name: true, email: true } },
-            },
+            include: SELECTION_INCLUDE,
           },
         },
       });
@@ -177,16 +193,10 @@ export const winnerRouter = router({
       }),
     )
     .mutation(
-      async ({
-        input,
-        ctx,
-      }): Promise<{
-        drawId: string;
-        winnerCount: number;
-        reserveCount: number;
-        eligiblePoolSize: number;
-        drawnAt: Date;
-      }> => {
+      // Return type is inferred from the implementation so the `selections`
+      // payload tracks SELECTION_INCLUDE without being restated here.
+      // tRPC propagates the inferred shape to client callers.
+      async ({ input, ctx }) => {
         const actorId = ctx.adminUser.id;
 
         // ── Activation existence + status gate ────────────────────────
@@ -242,8 +252,8 @@ export const winnerRouter = router({
           ? Prisma.sql`AND r."mrqAccountStatus" = 'ACTIVE'`
           : Prisma.empty;
 
-        // ── Transaction: draw row → pool snapshot → shuffle → selections → audit
-        const drawId = await prisma.$transaction(async (tx) => {
+        // ── Transaction: draw row → pool snapshot → shuffle → selections → audit → selections fetch
+        const txResult = await prisma.$transaction(async (tx) => {
           // 1. Create the WinnerDraw row.
           const draw = await tx.winnerDraw.create({
             data: {
@@ -345,16 +355,28 @@ export const winnerRouter = router({
             tx,
           });
 
-          return draw.id;
+          // 6. Fetch the just-inserted selections with the same shape as
+          //    `listForActivation`, so the result-state modal can render
+          //    without a separate round-trip (Option A — inline return).
+          //    Reads-your-writes is guaranteed inside the transaction;
+          //    nothing else can have modified these rows yet.
+          const selections = await tx.winnerDrawSelection.findMany({
+            where: { drawId: draw.id },
+            orderBy: { position: "asc" },
+            include: SELECTION_INCLUDE,
+          });
+
+          return { drawId: draw.id, selections, drawnAt: new Date() };
         });
 
         // Don't return the seed — it's server-side audit material only.
         return {
-          drawId,
+          drawId: txResult.drawId,
           winnerCount: input.winnerCount,
           reserveCount: input.reserveCount,
           eligiblePoolSize,
-          drawnAt: new Date(),
+          drawnAt: txResult.drawnAt,
+          selections: txResult.selections,
         };
       },
     ),
