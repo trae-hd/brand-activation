@@ -289,4 +289,26 @@ export const registrationRouter = router({
       });
       return { ok: true as const };
     }),
+
+  revealAllEmails: memberProcedure
+    .input(z.object({ activationId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.session.user.adminUserId ?? null;
+      // Single batch audit entry rather than one row per registration —
+      // mass-reveal is a coarser action than per-row reveal and the audit
+      // record reflects that. The activationId target lets reviewers see
+      // exactly which dataset was unmasked, in one row.
+      const count = await prisma.registration.count({
+        where: { activationId: input.activationId },
+      });
+      await writeAuditLog({
+        category: "ADMIN",
+        action: "EMAIL_REVEAL_BULK",
+        actorId,
+        targetType: "Activation",
+        targetId: input.activationId,
+        metadata: { reason: "admin-reveal-all", count },
+      });
+      return { ok: true as const, count };
+    }),
 });

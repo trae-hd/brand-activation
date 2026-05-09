@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { trpcReact } from "@/lib/trpc/react";
 import { Input } from "@/components/ui/input";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import type { MrqAccountStatus } from "@prisma/client";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
@@ -156,6 +157,7 @@ export function RegistrationsTable({
   const debouncedEntryCodeSearch = useDebounced(entryCodeSearch, 300);
 
   const revealMutation = trpcReact.registration.revealEmail.useMutation();
+  const revealAllMutation = trpcReact.registration.revealAllEmails.useMutation();
   const enrichMutation = trpcReact.registration.enrich.useMutation();
 
   const { data, refetch, isFetching } = trpcReact.registration.list.useQuery({
@@ -186,9 +188,34 @@ export function RegistrationsTable({
     return !max || d > max ? d : max;
   }, null);
 
-  async function handleReveal(id: string) {
+  async function handleToggleReveal(id: string) {
+    if (revealed.has(id)) {
+      // Hiding back is purely client-side — no audit entry. The original
+      // reveal is already logged; re-hiding is just visual restoration.
+      setRevealed((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      return;
+    }
     await revealMutation.mutateAsync({ registrationId: id });
     setRevealed((prev) => new Set([...prev, id]));
+  }
+
+  // True when at least one row on the current page is still masked. Drives
+  // the header button label/behaviour: when there's anything left to reveal,
+  // the action is "Reveal all"; otherwise it flips to "Hide all".
+  const someStillHidden = items.some((r) => !revealed.has(r.id));
+
+  async function handleToggleRevealAll() {
+    if (!someStillHidden) {
+      // Hide all — purely client-side (matches single-row hide semantics).
+      setRevealed(new Set());
+      return;
+    }
+    await revealAllMutation.mutateAsync({ activationId });
+    setRevealed((prev) => new Set([...prev, ...items.map((r) => r.id)]));
   }
 
   async function handleEnrich() {
@@ -204,6 +231,24 @@ export function RegistrationsTable({
           Registrations{total != null ? ` · ${total}` : ""}
         </h2>
         <div className="flex items-center gap-3">
+          {items.length > 0 && (
+            <button
+              onClick={handleToggleRevealAll}
+              disabled={revealAllMutation.isPending}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+              aria-label={someStillHidden ? "Reveal all emails on this page" : "Hide all emails on this page"}
+            >
+              <DynamicIcon
+                name={someStillHidden ? "Eye" : "EyeOff"}
+                className="h-3.5 w-3.5"
+              />
+              {revealAllMutation.isPending
+                ? "Revealing…"
+                : someStillHidden
+                ? "Reveal all"
+                : "Hide all"}
+            </button>
+          )}
           <button
             onClick={handleEnrich}
             disabled={enrichMutation.isPending}
@@ -315,9 +360,8 @@ export function RegistrationsTable({
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">MRQ account</th>
               <th className="px-4 py-3 text-left font-medium">MRQ joined</th>
-              <th className="px-4 py-3 text-left font-medium">MRQ last login</th>
               <th className="px-4 py-3">
-                <span className="sr-only">Reveal</span>
+                <span className="sr-only">Reveal email</span>
               </th>
             </tr>
           </thead>
@@ -325,7 +369,7 @@ export function RegistrationsTable({
             {visibleItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={10 + consentColCount + (hasEntryCodes ? 1 : 0)}
+                  colSpan={9 + consentColCount + (hasEntryCodes ? 1 : 0)}
                   className="px-4 py-8 text-center text-sm text-muted-foreground"
                 >
                   {data ? "No registrations match." : "Loading…"}
@@ -382,19 +426,19 @@ export function RegistrationsTable({
                     <td className="px-4 py-2.5 text-xs text-muted-foreground tabular-nums">
                       {fmtDate(r.mrqRegisteredAt)}
                     </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground tabular-nums">
-                      {fmtDate(r.mrqLastLoginAt)}
-                    </td>
                     <td className="px-4 py-2.5 text-right">
-                      {!isRevealed && (
-                        <button
-                          onClick={() => handleReveal(r.id)}
-                          disabled={revealMutation.isPending}
-                          className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
-                        >
-                          reveal
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleToggleReveal(r.id)}
+                        disabled={revealMutation.isPending}
+                        className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
+                        aria-label={isRevealed ? "Hide email" : "Reveal email"}
+                        title={isRevealed ? "Hide email" : "Reveal email"}
+                      >
+                        <DynamicIcon
+                          name={isRevealed ? "EyeOff" : "Eye"}
+                          className="h-3.5 w-3.5"
+                        />
+                      </button>
                     </td>
                   </tr>
                 );
