@@ -10,7 +10,8 @@ export default async function DashboardPage({
 }: {
   params: Promise<{ activationId: string }>;
 }) {
-  await requireRole("ANY");
+  const session = await requireRole("ANY");
+  const userRole = session.user.role ?? "MEMBER";
   const { activationId } = await params;
 
   const activation = await prisma.activation.findUnique({
@@ -35,6 +36,7 @@ export default async function DashboardPage({
           activationName={activation.name}
           status={activation.status}
           endsAt={activation.endsAt.toISOString()}
+          userRole={userRole}
         />
         <RegistrationsTable
           activationId={activation.id}

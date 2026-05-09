@@ -28,7 +28,9 @@ const mockWinnerDrawCreate = vi.fn();
 const mockWinnerDrawSelectionCreateMany = vi.fn();
 const mockSelectionFindUnique = vi.fn();
 const mockSelectionFindFirst = vi.fn();
+const mockSelectionFindMany = vi.fn();
 const mockSelectionUpdate = vi.fn();
+const mockWinnerDrawFindUnique = vi.fn();
 const mockExecuteRaw = vi.fn();
 const mockQueryRaw = vi.fn();
 const mockTransaction = vi.fn();
@@ -38,9 +40,11 @@ vi.mock("@/lib/db/prisma", () => ({
     activation: { findUnique: mockActivationFindUnique },
     adminUser: { findUnique: mockAdminUserFindUnique },
     registration: { count: mockRegistrationCount },
+    winnerDraw: { findUnique: mockWinnerDrawFindUnique },
     winnerDrawSelection: {
       findUnique: mockSelectionFindUnique,
       findFirst: mockSelectionFindFirst,
+      findMany: mockSelectionFindMany,
       update: mockSelectionUpdate,
     },
     $transaction: mockTransaction,
@@ -838,5 +842,119 @@ describe("winner.updateSelectionNotes", () => {
         notes: "anything",
       }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 4: copyEmails (used by the Pick Winners modal's result state)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("winner.copyEmails", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubAdminUser();
+  });
+
+  it("rejects with FORBIDDEN when called by a MEMBER (bulk copy is ADMIN-only)", async () => {
+    stubAdminUser("MEMBER");
+    const caller = await makeWinnerCaller("MEMBER");
+    await expect(
+      caller.copyEmails({ drawId: "draw-1" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects with NOT_FOUND when the draw doesn't exist", async () => {
+    mockWinnerDrawFindUnique.mockResolvedValueOnce(null);
+    const caller = await makeWinnerCaller();
+    await expect(
+      caller.copyEmails({ drawId: "missing" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("returns emails of WINNER selections only, excluding disqualified and reserves", async () => {
+    mockWinnerDrawFindUnique.mockResolvedValueOnce({
+      id: "draw-1",
+      activationId: "act-1",
+    });
+    // The mock should reflect the WHERE filter the procedure applies — we
+    // assert the filter shape below; here we return what the DB would
+    // return given that filter.
+    mockSelectionFindMany.mockResolvedValueOnce([
+      { position: 1, registration: { email: "winner1@example.com" } },
+      { position: 2, registration: { email: "winner2@example.com" } },
+      { position: 3, registration: { email: "promoted-reserve@example.com" } },
+    ]);
+
+    const caller = await makeWinnerCaller();
+    const result = await caller.copyEmails({ drawId: "draw-1" });
+
+    expect(result.emails).toEqual([
+      "winner1@example.com",
+      "winner2@example.com",
+      "promoted-reserve@example.com",
+    ]);
+
+    // Confirm the WHERE filter — type WINNER, status not DISQUALIFIED,
+    // registrationId not null
+    const findManyArg = mockSelectionFindMany.mock.calls[0][0];
+    expect(findManyArg.where).toMatchObject({
+      drawId: "draw-1",
+      type: "WINNER",
+      status: { not: "DISQUALIFIED" },
+      registrationId: { not: null },
+    });
+    expect(findManyArg.orderBy).toEqual({ position: "asc" });
+  });
+
+  it("skips selections with null registration (erased participants)", async () => {
+    mockWinnerDrawFindUnique.mockResolvedValueOnce({
+      id: "draw-1",
+      activationId: "act-1",
+    });
+    // findMany already filters registrationId not null, but the result
+    // shape includes a nullable registration relation. Defensive filter
+    // in the procedure handles edge cases (e.g. erasure between findMany
+    // and the .registration?.email read).
+    mockSelectionFindMany.mockResolvedValueOnce([
+      { position: 1, registration: { email: "live@example.com" } },
+      { position: 2, registration: null },
+      { position: 3, registration: { email: "" } },
+    ]);
+
+    const caller = await makeWinnerCaller();
+    const result = await caller.copyEmails({ drawId: "draw-1" });
+
+    expect(result.emails).toEqual(["live@example.com"]);
+  });
+
+  it("writes a winner.draw.bulk_email_copied audit row with the count", async () => {
+    mockWinnerDrawFindUnique.mockResolvedValueOnce({
+      id: "draw-1",
+      activationId: "act-1",
+    });
+    mockSelectionFindMany.mockResolvedValueOnce([
+      { position: 1, registration: { email: "a@example.com" } },
+      { position: 2, registration: { email: "b@example.com" } },
+    ]);
+
+    const caller = await makeWinnerCaller();
+    await caller.copyEmails({ drawId: "draw-1" });
+
+    expect(mockWriteAuditLog).toHaveBeenCalledTimes(1);
+    const auditArg = mockWriteAuditLog.mock.calls[0][0];
+    expect(auditArg).toMatchObject({
+      category: "ADMIN",
+      action: "winner.draw.bulk_email_copied",
+      actorId: "admin-1",
+      targetType: "WinnerDraw",
+      targetId: "draw-1",
+      metadata: {
+        activationId: "act-1",
+        count: 2,
+      },
+    });
+    // Audit metadata must NOT contain the emails themselves (PII guard)
+    expect(auditArg.metadata).not.toHaveProperty("emails");
+    expect(JSON.stringify(auditArg.metadata)).not.toContain("@example.com");
   });
 });

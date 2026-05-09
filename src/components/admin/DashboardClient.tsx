@@ -12,13 +12,15 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeClass } from "@/lib/activationStatus";
-import type { ActivationStatus } from "@prisma/client";
+import type { ActivationStatus, AdminRole } from "@prisma/client";
+import { PickWinnersButton } from "./winner/PickWinnersButton";
 
 interface Props {
   activationId: string;
   activationName: string;
   status: ActivationStatus;
   endsAt: string;
+  userRole: AdminRole;
 }
 
 function formatTimeRemaining(endsAt: string): string {
@@ -54,6 +56,7 @@ export function DashboardClient({
   activationName,
   status,
   endsAt,
+  userRole,
 }: Props) {
   const { data, dataUpdatedAt } = trpcReact.registration.dashboardStats.useQuery(
     { activationId },
@@ -86,6 +89,11 @@ export function DashboardClient({
           <h2 className="text-2xl font-semibold">{activationName}</h2>
         </div>
         <div className="flex items-center gap-3">
+          <PickWinnersButton
+            activationId={activationId}
+            activationStatus={status}
+            userRole={userRole}
+          />
           <a
             href={`/api/admin/registrations/export?activationId=${activationId}`}
             download

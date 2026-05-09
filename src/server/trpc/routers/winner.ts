@@ -596,6 +596,69 @@ export const winnerRouter = router({
     }),
 
   /**
+   * Bulk-copy winner emails for a draw. ADMIN-only.
+   *
+   * Returns the live winner emails (type = WINNER, status != DISQUALIFIED;
+   * which includes SELECTED, NOTIFIED, DECLINED, CONFIRMED) as an array
+   * of strings. Disqualified winners are excluded — the promoted reserve
+   * has type = WINNER and is automatically included. Erased participants
+   * (registrationId NULL) are skipped.
+   *
+   * Writes a single ADMIN-category audit row capturing the activationId
+   * and the count of emails returned. Per the team's permissions table
+   * (§1.5), this mutation is ADMIN-only — bulk copy is the leakiest
+   * surface, so MEMBERs must reveal-and-copy individually.
+   */
+  copyEmails: adminProcedure
+    .input(z.object({ drawId: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.adminUser.id;
+
+      const draw = await prisma.winnerDraw.findUnique({
+        where: { id: input.drawId },
+        select: { id: true, activationId: true },
+      });
+      if (!draw) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Draw not found.",
+        });
+      }
+
+      const winners = await prisma.winnerDrawSelection.findMany({
+        where: {
+          drawId: input.drawId,
+          type: "WINNER",
+          status: { not: "DISQUALIFIED" },
+          registrationId: { not: null },
+        },
+        orderBy: { position: "asc" },
+        select: {
+          position: true,
+          registration: { select: { email: true } },
+        },
+      });
+
+      const emails = winners
+        .map((s) => s.registration?.email)
+        .filter((e): e is string => typeof e === "string" && e.length > 0);
+
+      await writeAuditLog({
+        category: "ADMIN",
+        action: "winner.draw.bulk_email_copied",
+        actorId,
+        targetType: "WinnerDraw",
+        targetId: draw.id,
+        metadata: {
+          activationId: draw.activationId,
+          count: emails.length,
+        },
+      });
+
+      return { emails };
+    }),
+
+  /**
    * Edit `notificationNotes` on a selection. ADMIN + MEMBER.
    *
    * Use this when an admin needs to update the notes after first marking
