@@ -48,6 +48,13 @@ export function ActivationRegistrationTab({ value, onChange, onAnyChange }: Prop
         onChange={(url) => { onChange({ ...value, heroImageUrl: url }); onAnyChange(); }}
         altText={value.heroImageAlt}
         onAltTextChange={(alt) => { onChange({ ...value, heroImageAlt: alt }); onAnyChange(); }}
+        constraints={{
+          // 300 KB cap — keeps the participant page snappy on event Wi-Fi.
+          maxSizeBytes: 300_000,
+          // 2:1 with ±2.5% tolerance (so 1.95–2.05 passes silently).
+          aspectRange: [1.95, 2.05],
+          aspectLabel: "2:1",
+        }}
       />
 
       {/* Marketing copy */}

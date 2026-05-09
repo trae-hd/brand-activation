@@ -6,6 +6,7 @@ import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { Input } from "@/components/ui/input";
 import { CharCount } from "@/components/ui/CharCount";
 import { SectionLabel } from "./form-section";
+import { validateImageFile, type ImageConstraints } from "@/lib/upload/validateImage";
 
 interface Props {
   heroImageUrl: string;
@@ -13,6 +14,9 @@ interface Props {
   altText?: string;
   onAltTextChange?: (alt: string) => void;
   label?: string;
+  /** Upload constraints. Required for client-side validation. The methodology
+   *  page documents the recommended values for each slot. */
+  constraints: ImageConstraints;
 }
 
 export function ActivationFormHeroImage({
@@ -21,20 +25,36 @@ export function ActivationFormHeroImage({
   altText,
   onAltTextChange,
   label = "Hero image",
+  constraints,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function readFileAsDataUrl(file: File) {
-    if (!file.type.startsWith("image/")) return;
+  async function readFileAsDataUrl(file: File) {
+    setErrors([]);
+    setWarnings([]);
     setIsUploading(true);
+
+    const result = await validateImageFile(file, constraints);
+    if (result.errors.length > 0) {
+      setErrors(result.errors);
+      setIsUploading(false);
+      return;
+    }
+    setWarnings(result.warnings);
+
     const reader = new FileReader();
     reader.onload = (e) => {
       onChange((e.target?.result as string) ?? "");
       setIsUploading(false);
     };
-    reader.onerror = () => setIsUploading(false);
+    reader.onerror = () => {
+      setErrors(["Couldn't read the file. Please try again."]);
+      setIsUploading(false);
+    };
     reader.readAsDataURL(file);
   }
 
@@ -42,13 +62,19 @@ export function ActivationFormHeroImage({
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) readFileAsDataUrl(file);
+    if (file) void readFileAsDataUrl(file);
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) readFileAsDataUrl(file);
+    if (file) void readFileAsDataUrl(file);
     e.target.value = "";
+  }
+
+  function handleRemove() {
+    onChange("");
+    setErrors([]);
+    setWarnings([]);
   }
 
   return (
@@ -80,7 +106,7 @@ export function ActivationFormHeroImage({
             />
             <button
               type="button"
-              onClick={() => onChange("")}
+              onClick={handleRemove}
               className="bg-background/80 hover:bg-background absolute top-2 right-2 rounded-full p-1 shadow transition-colors"
               aria-label="Remove image"
             >
@@ -120,6 +146,40 @@ export function ActivationFormHeroImage({
           onChange={handleFileInput}
         />
       </div>
+
+      {/* Validation surface — errors block the upload, warnings are advisory. */}
+      {errors.length > 0 && (
+        <div
+          role="alert"
+          className="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md border border-destructive/30 px-2.5 py-2 text-xs"
+        >
+          <DynamicIcon name="AlertCircle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <ul className="flex-1 space-y-0.5">
+            {errors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {warnings.length > 0 && (
+        <div className="bg-amber-500/10 text-amber-700 dark:text-amber-300 flex items-start gap-2 rounded-md border border-amber-500/30 px-2.5 py-2 text-xs">
+          <DynamicIcon name="AlertTriangle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div className="flex-1 space-y-0.5">
+            <ul className="space-y-0.5">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setWarnings([])}
+              className="underline-offset-2 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Alt text — only shown when an image is set and a handler is provided */}
       {heroImageUrl && onAltTextChange !== undefined && (

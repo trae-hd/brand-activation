@@ -295,6 +295,57 @@ export default function MethodologyPage() {
                 </li>
               </ul>
             </SubSection>
+            <SubSection title="Hero image specifications">
+              <p>
+                The hero image renders full-width inside a mobile-first container at a{" "}
+                <strong>fixed 2:1 aspect ratio</strong>. Anything outside the 2:1 frame gets cropped
+                (<code>object-cover</code>) so the image fills its slot cleanly across phone widths.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Aspect ratio:</strong> 2 : 1 (must be exact — anything else gets cropped
+                  on participant phones)
+                </li>
+                <li>
+                  <strong>Recommended export size:</strong> 1200 × 600 px
+                </li>
+                <li>
+                  <strong>Minimum acceptable:</strong> 800 × 400 px
+                </li>
+                <li>
+                  <strong>Maximum useful:</strong> 1600 × 800 px (more than this is wasted bytes)
+                </li>
+                <li>
+                  <strong>File format:</strong> JPG for photography, PNG for graphics with text or
+                  sharp edges
+                </li>
+                <li>
+                  <strong>Colour space:</strong> sRGB
+                </li>
+                <li>
+                  <strong>Max file size:</strong> ≤ 300 KB after compression — participants are
+                  often on event Wi-Fi or 4G
+                </li>
+              </ul>
+              <p className="mt-2">
+                <strong>Composition rules:</strong>
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Keep critical content (logos, faces, text) inside the central 80% of the frame.
+                  Edges may get cropped on narrow phones.
+                </li>
+                <li>
+                  Avoid baked-in text overlays. Text rendering on top of the image is fragile across
+                  screen widths — use the activation name and rich-text content fields for copy
+                  instead.
+                </li>
+                <li>
+                  Avoid pure-white backgrounds — they look cropped against the page card&apos;s
+                  subtle borders.
+                </li>
+              </ul>
+            </SubSection>
             <Callout type="warning">
               Editing any audited content field on an APPROVED activation (including the consent
               notice) transitions the activation to DRAFT_EDITED and requires re-approval.
@@ -338,6 +389,61 @@ export default function MethodologyPage() {
                 <li>
                   <strong>Show resend link</strong> — toggle (default: on). Displays a
                   &ldquo;Didn&apos;t get it? Resend&rdquo; link.
+                </li>
+              </ul>
+            </SubSection>
+            <SubSection title="Sponsor logo specifications">
+              <p>
+                The sponsor logo renders inside a fixed 120 × 40 px slot in the success-page sponsor
+                block, scaled with <code>object-contain</code> so the logo is preserved at any
+                aspect ratio (no cropping). Aspect ratios significantly wider or taller than 3:1
+                will leave whitespace beside the logo.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Display size:</strong> 120 × 40 px
+                </li>
+                <li>
+                  <strong>Recommended export size:</strong> 480 × 160 px (4× retina)
+                </li>
+                <li>
+                  <strong>Minimum acceptable:</strong> 360 × 120 px (3× retina)
+                </li>
+                <li>
+                  <strong>Best aspect ratio:</strong> 3 : 1 (matches the slot exactly)
+                </li>
+                <li>
+                  <strong>Acceptable aspect range:</strong> 2 : 1 to 4 : 1
+                </li>
+                <li>
+                  <strong>File format:</strong> PNG with transparent background (preferred). SVG
+                  works too. JPG only if the logo has no transparency.
+                </li>
+                <li>
+                  <strong>Colour space:</strong> sRGB
+                </li>
+                <li>
+                  <strong>Max file size:</strong> ≤ 50 KB
+                </li>
+              </ul>
+              <p className="mt-2">
+                <strong>Composition rules:</strong>
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Use a transparent background, not white. The sponsor block sits on a bordered card
+                  with a subtle background; a white logo box will clip awkwardly.
+                </li>
+                <li>
+                  Leave at least 8 px of padding inside the logo&apos;s bounding box. Logos that
+                  bleed to the edge can look cut off when scaled.
+                </li>
+                <li>
+                  For monochrome logos, supply the dark-on-light variant — the page is light-themed.
+                </li>
+                <li>
+                  Avoid effects that depend on a specific background colour (drop shadows blending
+                  into white, gradients matching the page bg, etc.).
                 </li>
               </ul>
             </SubSection>

@@ -233,6 +233,13 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
         altText={value.successSponsorLogoAlt}
         onAltTextChange={(alt) => set("successSponsorLogoAlt", alt)}
         label="Sponsor logo"
+        constraints={{
+          // Logos are tiny — 50 KB cap is generous for PNG with transparency.
+          maxSizeBytes: 50_000,
+          // Slot is 3:1; object-contain handles 2:1 to 4:1 with minimal whitespace.
+          aspectRange: [2, 4],
+          aspectLabel: "between 2:1 and 4:1 (ideal 3:1)",
+        }}
       />
 
       <div className="flex flex-col gap-1.5">
