@@ -1,6 +1,10 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pnpm install --frozen-lockfile && SKIP_ENV_VALIDATION=1 pnpm build"
+# `--prod=false` forces pnpm to install devDependencies even though Nixpacks
+# sets NODE_ENV=production. We need them at build time (typescript, @types/*,
+# tsx, etc.) but not at runtime — Next.js tree-shakes the production bundle so
+# they don't leak into the deployed image.
+buildCommand = "pnpm install --frozen-lockfile --prod=false && SKIP_ENV_VALIDATION=1 pnpm build"
 
 [deploy]
 startCommand = "pnpm prisma migrate deploy && pnpm start"
