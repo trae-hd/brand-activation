@@ -58,6 +58,14 @@ export function SuccessSessionData({
     ? ""
     : "bg-primary text-primary-foreground";
 
+  // Entry-code card uses the activation's brand colour as the background and
+  // white text. When no brand colour is configured, fall back to the platform
+  // default (#0a2ecb) so the card always has the same shape — kept consistent
+  // with the new "default new activations to MrQ blue" behaviour.
+  const entryCodeBg = primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
+    ? primaryColor
+    : "#0a2ecb";
+
   async function handleResend() {
     const { activationId, email, consentVersion } = session;
     if (isResending || !activationId || !email || !consentVersion) return;
@@ -84,14 +92,17 @@ export function SuccessSessionData({
       )}
 
       {showEntryCode && session.entryCode && (
-        <div className="mt-5 w-full rounded-md p-4" style={{ background: "#fef4a8" }}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div
+          className="mt-5 w-full rounded-md p-4 text-white"
+          style={{ background: entryCodeBg, color: "#ffffff" }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest">
             Your entry code
           </p>
           <p className="mt-1 font-mono text-3xl font-bold tracking-wider">
             {session.entryCode}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs">
             Keep this handy — you&apos;ll need it later.
           </p>
         </div>

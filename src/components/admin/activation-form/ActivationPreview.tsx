@@ -118,6 +118,13 @@ export function ActivationPreview({
     ? ""
     : "bg-primary text-primary-foreground";
 
+  // Mirrors the live SuccessSessionData entry-code card: brand colour as
+  // background, white text, with #0a2ecb as the platform fallback when the
+  // activation has no valid hex set yet.
+  const entryCodeBg = primaryColor.match(/^#[0-9a-fA-F]{6}$/)
+    ? primaryColor
+    : "#0a2ecb";
+
   const previewBody = extractBody(content);
   const ctaLabel = ctaText.trim() || "Send me a code";
   const showTerms = hasContent(termsContent);
@@ -145,6 +152,7 @@ export function ActivationPreview({
     successShowEntryCode,
     successShowResend,
     successShowCta,
+    entryCodeBg,
     successSponsorLogoUrl: successSponsorLogoUrl || "",
     successSponsorHeadline: successSponsorHeadline || "",
     successSponsorBody: successSponsorBody || "",
@@ -385,6 +393,7 @@ interface SuccessMobilePreviewProps {
   successShowEntryCode: boolean;
   successShowResend: boolean;
   successShowCta: boolean;
+  entryCodeBg: string;
   successSponsorLogoUrl: string;
   successSponsorHeadline: string;
   successSponsorBody: string;
@@ -401,6 +410,7 @@ function SuccessMobilePreview({
   successShowEntryCode,
   successShowResend,
   successShowCta,
+  entryCodeBg,
   successSponsorLogoUrl,
   successSponsorHeadline,
   successSponsorBody,
@@ -431,8 +441,11 @@ function SuccessMobilePreview({
             <p className="text-muted-foreground text-[10px] leading-snug line-clamp-2">{bodyText}</p>
           )}
           {successShowEntryCode && (
-            <div className="rounded border bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1.5">
-              <p className="text-muted-foreground text-[8px] uppercase tracking-widest">Entry code</p>
+            <div
+              className="rounded px-2 py-1.5"
+              style={{ backgroundColor: entryCodeBg, color: "#ffffff" }}
+            >
+              <p className="text-[8px] uppercase tracking-widest">Entry code</p>
               <p className="font-mono text-[13px] font-bold tracking-wider">ABC123</p>
             </div>
           )}
