@@ -20,11 +20,15 @@ export interface OtpEmailProps {
   to: string;
 }
 
-export function OtpEmail({ otp = "482 619", to = "you@example.com" }: OtpEmailProps) {
-  const formatted =
-    otp.replace(/\s/g, "").length === 6
-      ? `${otp.replace(/\s/g, "").slice(0, 3)} ${otp.replace(/\s/g, "").slice(3)}`
-      : otp;
+export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailProps) {
+  // Render OTP as a single contiguous 6-digit string (no space). Two reasons:
+  //   1. The previous "XXX XXX" formatting wrapped to two lines on narrow
+  //      mobile email clients (the space is a line-break opportunity).
+  //   2. The space made copy-paste fail — pasting "482 619" into the
+  //      OtpInput stops at the space because the slot pattern is digits-only.
+  // OtpInput is also defensively sanitised to strip non-digits on paste,
+  // belt-and-braces against any other source of formatted codes.
+  const formatted = otp.replace(/\D/g, "");
 
   return (
     <Html lang="en">
@@ -145,9 +149,13 @@ export function OtpEmail({ otp = "482 619", to = "you@example.com" }: OtpEmailPr
                             fontSize: 44,
                             fontWeight: 700,
                             color: "#1c1917",
-                            letterSpacing: "14px",
+                            // Tighter spacing than before (was 14px) so 6
+                            // digits fit on one line in narrower email
+                            // clients and the digits read as one chunk.
+                            letterSpacing: "8px",
                             lineHeight: "1",
-                            paddingLeft: "14px",
+                            paddingLeft: "8px",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {formatted}
