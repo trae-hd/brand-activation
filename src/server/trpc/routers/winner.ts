@@ -358,4 +358,313 @@ export const winnerRouter = router({
         };
       },
     ),
+
+  /**
+   * Disqualify a selection. ADMIN-only.
+   *
+   * Behaviour (§2.3):
+   *   - Reject if the selection doesn't exist (NOT_FOUND).
+   *   - Reject if the selection is already disqualified (BAD_REQUEST) —
+   *     idempotency must be explicit, never silently re-runnable.
+   *   - Mark the selection DISQUALIFIED with reason + actor + timestamp.
+   *   - **If the disqualified row was a WINNER**: find the topmost RESERVE
+   *     selection in the same draw still in SELECTED status (lowest position
+   *     where type = RESERVE AND status = SELECTED) and promote it:
+   *     type → WINNER, promotedFromReserveAt = now(). If no eligible reserve
+   *     exists the slot stays unfilled (admin must start a new draw to
+   *     backfill — out of v1 scope).
+   *   - **If the disqualified row was a RESERVE**: no promotion. Reserves
+   *     don't auto-shuffle to backfill each other in v1.
+   *   - All updates happen inside a single Prisma.$transaction so the
+   *     disqualification + (optional) promotion + (one or two) audit log
+   *     entries either all commit or all roll back.
+   */
+  disqualifySelection: adminProcedure
+    .input(
+      z.object({
+        selectionId: z.string().min(1),
+        reason: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.adminUser.id;
+
+      // Load the selection up-front (outside the transaction) so the
+      // NOT_FOUND / BAD_REQUEST errors fire cheaply without holding a
+      // transaction open.
+      const selection = await prisma.winnerDrawSelection.findUnique({
+        where: { id: input.selectionId },
+        select: {
+          id: true,
+          drawId: true,
+          activationId: true,
+          position: true,
+          type: true,
+          status: true,
+        },
+      });
+      if (!selection) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Selection not found.",
+        });
+      }
+      if (selection.status !== "SELECTED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Selection is already ${selection.status.toLowerCase()}.`,
+        });
+      }
+
+      const now = new Date();
+
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Mark the selection DISQUALIFIED.
+        await tx.winnerDrawSelection.update({
+          where: { id: selection.id },
+          data: {
+            status: "DISQUALIFIED",
+            disqualifiedAt: now,
+            disqualifiedById: actorId,
+            disqualifiedReason: input.reason,
+          },
+        });
+
+        // 2. Audit-log the disqualification.
+        await writeAuditLog({
+          category: "ADMIN",
+          action: "winner.selection.disqualified",
+          actorId,
+          targetType: "WinnerDrawSelection",
+          targetId: selection.id,
+          metadata: {
+            activationId: selection.activationId,
+            drawId: selection.drawId,
+            position: selection.position,
+            type: selection.type,
+            reason: input.reason,
+          },
+          tx,
+        });
+
+        // 3. If the disqualified row was a WINNER, look for the topmost
+        //    RESERVE in the same draw still SELECTED and promote it.
+        let promotedSelectionId: string | null = null;
+        if (selection.type === "WINNER") {
+          const nextReserve = await tx.winnerDrawSelection.findFirst({
+            where: {
+              drawId: selection.drawId,
+              type: "RESERVE",
+              status: "SELECTED",
+            },
+            orderBy: { position: "asc" },
+            select: { id: true, position: true },
+          });
+
+          if (nextReserve) {
+            await tx.winnerDrawSelection.update({
+              where: { id: nextReserve.id },
+              data: {
+                type: "WINNER",
+                promotedFromReserveAt: now,
+              },
+            });
+
+            await writeAuditLog({
+              category: "ADMIN",
+              action: "winner.selection.promoted",
+              actorId,
+              targetType: "WinnerDrawSelection",
+              targetId: nextReserve.id,
+              metadata: {
+                activationId: selection.activationId,
+                drawId: selection.drawId,
+                fromPosition: nextReserve.position,
+                toPosition: selection.position,
+                replacedSelectionId: selection.id,
+              },
+              tx,
+            });
+
+            promotedSelectionId = nextReserve.id;
+          }
+        }
+
+        return {
+          disqualifiedSelectionId: selection.id,
+          promotedSelectionId,
+        };
+      });
+
+      return result;
+    }),
+
+  /**
+   * Mark a selection as notified by the admin team. ADMIN + MEMBER.
+   *
+   * Always writes a winner.selection.notified audit row. If a non-empty
+   * `note` is supplied, also updates the notes fields and writes a
+   * separate winner.selection.notes_updated audit row capturing length
+   * deltas only (no content).
+   *
+   * Idempotent: calling twice is allowed (e.g. an admin updates the note
+   * later); each call writes its own audit row so the history is
+   * recoverable from the AuditLog table even though the row only stores
+   * the latest values.
+   */
+  markNotified: memberProcedure
+    .input(
+      z.object({
+        selectionId: z.string().min(1),
+        note: z.string().max(2000).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.adminUser.id;
+
+      const existing = await prisma.winnerDrawSelection.findUnique({
+        where: { id: input.selectionId },
+        select: {
+          id: true,
+          drawId: true,
+          activationId: true,
+          position: true,
+          notificationNotes: true,
+        },
+      });
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Selection not found.",
+        });
+      }
+
+      const now = new Date();
+      const trimmedNote = input.note?.trim() ?? "";
+      const hasNoteUpdate = trimmedNote.length > 0;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.winnerDrawSelection.update({
+          where: { id: existing.id },
+          data: {
+            notifiedAt: now,
+            notifiedById: actorId,
+            ...(hasNoteUpdate
+              ? {
+                  notificationNotes: trimmedNote,
+                  notesUpdatedAt: now,
+                  notesUpdatedById: actorId,
+                }
+              : {}),
+          },
+        });
+
+        await writeAuditLog({
+          category: "ADMIN",
+          action: "winner.selection.notified",
+          actorId,
+          targetType: "WinnerDrawSelection",
+          targetId: existing.id,
+          metadata: {
+            activationId: existing.activationId,
+            drawId: existing.drawId,
+            position: existing.position,
+          },
+          tx,
+        });
+
+        if (hasNoteUpdate) {
+          await writeAuditLog({
+            category: "ADMIN",
+            action: "winner.selection.notes_updated",
+            actorId,
+            targetType: "WinnerDrawSelection",
+            targetId: existing.id,
+            metadata: {
+              activationId: existing.activationId,
+              drawId: existing.drawId,
+              position: existing.position,
+              previousLength: existing.notificationNotes?.length ?? 0,
+              newLength: trimmedNote.length,
+            },
+            tx,
+          });
+        }
+      });
+
+      return { ok: true as const };
+    }),
+
+  /**
+   * Edit `notificationNotes` on a selection. ADMIN + MEMBER.
+   *
+   * Use this when an admin needs to update the notes after first marking
+   * notified — separate from `markNotified` so re-marking-notified isn't a
+   * side effect of editing notes.
+   *
+   * Writes a winner.selection.notes_updated audit row capturing
+   * previousLength + newLength only (no content) — full content history
+   * is recoverable from the AuditLog table only by querying the row's
+   * value at each timestamp; we don't snapshot the content because
+   * notification notes can contain participant PII (names, phone numbers,
+   * call summaries) which would proliferate copies.
+   */
+  updateSelectionNotes: memberProcedure
+    .input(
+      z.object({
+        selectionId: z.string().min(1),
+        notes: z.string().max(2000),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.adminUser.id;
+
+      const existing = await prisma.winnerDrawSelection.findUnique({
+        where: { id: input.selectionId },
+        select: {
+          id: true,
+          drawId: true,
+          activationId: true,
+          position: true,
+          notificationNotes: true,
+        },
+      });
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Selection not found.",
+        });
+      }
+
+      const trimmed = input.notes.trim();
+
+      await prisma.$transaction(async (tx) => {
+        await tx.winnerDrawSelection.update({
+          where: { id: existing.id },
+          data: {
+            notificationNotes: trimmed.length > 0 ? trimmed : null,
+            notesUpdatedAt: new Date(),
+            notesUpdatedById: actorId,
+          },
+        });
+
+        await writeAuditLog({
+          category: "ADMIN",
+          action: "winner.selection.notes_updated",
+          actorId,
+          targetType: "WinnerDrawSelection",
+          targetId: existing.id,
+          metadata: {
+            activationId: existing.activationId,
+            drawId: existing.drawId,
+            position: existing.position,
+            previousLength: existing.notificationNotes?.length ?? 0,
+            newLength: trimmed.length,
+          },
+          tx,
+        });
+      });
+
+      return { ok: true as const };
+    }),
 });
