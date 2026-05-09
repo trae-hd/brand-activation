@@ -12,6 +12,14 @@ import type {
   SelectionType,
 } from "@prisma/client";
 
+type TypeFilter = "ALL" | "WINNERS" | "RESERVES";
+
+const TYPE_FILTERS: { label: string; value: TypeFilter }[] = [
+  { label: "All", value: "ALL" },
+  { label: "Winners", value: "WINNERS" },
+  { label: "Reserves", value: "RESERVES" },
+];
+
 interface Props {
   activationId: string;
   userRole: AdminRole;
@@ -125,8 +133,11 @@ export function WinnersSection({ activationId, userRole }: Props) {
     id: string;
     label: string;
   } | null>(null);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
 
   const revealEmailMutation = trpcReact.registration.revealEmail.useMutation();
+  const revealAllEmailsMutation =
+    trpcReact.registration.revealAllEmails.useMutation();
   const markNotifiedMutation = trpcReact.winner.markNotified.useMutation({
     onSuccess: () => utils.winner.listForActivation.invalidate(),
   });
@@ -169,12 +180,101 @@ export function WinnersSection({ activationId, userRole }: Props) {
     setEditingNotesValue("");
   }
 
+  // ── Reveal-all / Hide-all ─────────────────────────────────────────
+  // Mirrors RegistrationsTable: a single bulk audit entry covers the
+  // mass-reveal action; subsequent toggles are purely client-side.
+  const allSelectionIds = draws.flatMap((d) => d.selections.map((s) => s.id));
+  const someStillHidden = allSelectionIds.some((id) => !revealedSelections.has(id));
+
+  async function handleToggleRevealAll() {
+    if (!someStillHidden) {
+      setRevealedSelections(new Set());
+      return;
+    }
+    await revealAllEmailsMutation.mutateAsync({ activationId });
+    setRevealedSelections(new Set(allSelectionIds));
+  }
+
+  // ── CSV download (ADMIN-only) ─────────────────────────────────────
+  // Builds a CSV in-memory from the already-loaded draws data, after
+  // logging a bulk-reveal audit entry. Per Methodology §13.6, exporting
+  // is treated as equivalent to revealing for compliance purposes.
+  async function handleDownloadCsv() {
+    if (!isAdmin) return;
+    await revealAllEmailsMutation.mutateAsync({ activationId });
+    setRevealedSelections(new Set(allSelectionIds));
+
+    const csv = buildWinnersCsv(draws);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    a.download = `winners-${activationId}-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <h2 className="text-xl font-semibold">
           Winners{draws.length > 1 ? ` · ${draws.length} draws` : ""}
         </h2>
+        <div className="flex items-center gap-3">
+          {allSelectionIds.length > 0 && (
+            <button
+              onClick={handleToggleRevealAll}
+              disabled={revealAllEmailsMutation.isPending}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm underline-offset-4 hover:underline disabled:opacity-50"
+              aria-label={
+                someStillHidden
+                  ? "Reveal all winner emails"
+                  : "Hide all winner emails"
+              }
+            >
+              <DynamicIcon
+                name={someStillHidden ? "Eye" : "EyeOff"}
+                className="h-3.5 w-3.5"
+              />
+              {revealAllEmailsMutation.isPending
+                ? "Revealing…"
+                : someStillHidden
+                ? "Reveal all"
+                : "Hide all"}
+            </button>
+          )}
+          {isAdmin && allSelectionIds.length > 0 && (
+            <button
+              onClick={handleDownloadCsv}
+              disabled={revealAllEmailsMutation.isPending}
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm underline-offset-4 hover:underline disabled:opacity-50"
+              aria-label="Download winners CSV"
+            >
+              <DynamicIcon name="Download" className="h-3.5 w-3.5" />
+              Download CSV
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Type filter pills — apply across all draws */}
+      <div className="flex flex-wrap items-center gap-2">
+        {TYPE_FILTERS.map(({ label, value }) => (
+          <button
+            key={value}
+            onClick={() => setTypeFilter(value)}
+            className={
+              typeFilter === value
+                ? "bg-foreground text-background rounded-full px-3 py-1 text-xs font-medium"
+                : "text-muted-foreground hover:text-foreground rounded-full border px-3 py-1 text-xs font-medium"
+            }
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {draws.map((draw, drawIndex) => {
@@ -227,7 +327,28 @@ export function WinnersSection({ activationId, userRole }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {draw.selections.map((sel) => {
+                  {(() => {
+                    const filtered = draw.selections.filter((sel) =>
+                      typeFilter === "WINNERS"
+                        ? sel.type === "WINNER"
+                        : typeFilter === "RESERVES"
+                        ? sel.type === "RESERVE"
+                        : true,
+                    );
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="text-muted-foreground px-3 py-6 text-center text-xs"
+                          >
+                            No {typeFilter === "WINNERS" ? "winners" : "reserves"} in
+                            this draw.
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return filtered.map((sel) => {
                     const reg = sel.registration;
                     const revealed = revealedSelections.has(sel.id);
                     const isDisqualified = sel.status === "DISQUALIFIED";
@@ -391,7 +512,8 @@ export function WinnersSection({ activationId, userRole }: Props) {
                         </td>
                       </tr>
                     );
-                  })}
+                  });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -484,4 +606,106 @@ export function WinnersSection({ activationId, userRole }: Props) {
 
 function hasNotesPreview(notes: string | null | undefined): boolean {
   return typeof notes === "string" && notes.trim().length > 0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSV builder — runs client-side from the already-loaded draws data
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** RFC-4180-ish escaping: wrap in quotes when the value contains a comma,
+ *  newline, or quote; double any embedded quotes. */
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = value instanceof Date ? value.toISOString() : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+type DrawForCsv = {
+  id: string;
+  drawnAt: Date | string;
+  drawnBy: { name: string | null } | null;
+  eligibilityCutoffAt: Date | string;
+  mrqAccountOnly: boolean;
+  selections: Array<{
+    type: SelectionType;
+    position: number;
+    status: SelectionStatus;
+    notifiedAt: Date | string | null;
+    notifiedBy: { name: string | null } | null;
+    notificationNotes: string | null;
+    disqualifiedAt: Date | string | null;
+    disqualifiedBy: { name: string | null } | null;
+    promotedFromReserveAt: Date | string | null;
+    registration: {
+      email: string;
+      entryCode: string | null;
+      mrqAccountStatus: MrqAccountStatus;
+    } | null;
+  }>;
+};
+
+function buildWinnersCsv(draws: DrawForCsv[]): string {
+  const headers = [
+    "Draw #",
+    "Drawn at",
+    "Drawn by",
+    "Cutoff",
+    "MrQ-only",
+    "Type",
+    "Position",
+    "Status",
+    "Email",
+    "Entry code",
+    "MrQ account",
+    "Notified at",
+    "Notified by",
+    "Notes",
+    "Disqualified at",
+    "Disqualified by",
+    "Promoted from reserve at",
+  ];
+
+  const rows: string[] = [headers.map(csvEscape).join(",")];
+
+  // Most recent draw = highest number, matching the on-screen numbering.
+  draws.forEach((draw, drawIndex) => {
+    const drawNumber = draws.length - drawIndex;
+    draw.selections.forEach((sel) => {
+      rows.push(
+        [
+          drawNumber,
+          draw.drawnAt instanceof Date
+            ? draw.drawnAt.toISOString()
+            : new Date(draw.drawnAt).toISOString(),
+          draw.drawnBy?.name ?? "",
+          draw.eligibilityCutoffAt instanceof Date
+            ? draw.eligibilityCutoffAt.toISOString()
+            : new Date(draw.eligibilityCutoffAt).toISOString(),
+          draw.mrqAccountOnly ? "yes" : "no",
+          sel.type,
+          sel.position,
+          sel.status,
+          sel.registration?.email ?? "[erased]",
+          sel.registration?.entryCode ?? "",
+          sel.registration?.mrqAccountStatus ?? "",
+          sel.notifiedAt
+            ? new Date(sel.notifiedAt).toISOString()
+            : "",
+          sel.notifiedBy?.name ?? "",
+          sel.notificationNotes ?? "",
+          sel.disqualifiedAt
+            ? new Date(sel.disqualifiedAt).toISOString()
+            : "",
+          sel.disqualifiedBy?.name ?? "",
+          sel.promotedFromReserveAt
+            ? new Date(sel.promotedFromReserveAt).toISOString()
+            : "",
+        ]
+          .map(csvEscape)
+          .join(","),
+      );
+    });
+  });
+
+  return rows.join("\n") + "\n";
 }

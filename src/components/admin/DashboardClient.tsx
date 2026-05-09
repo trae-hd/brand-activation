@@ -12,15 +12,13 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { statusBadgeClass } from "@/lib/activationStatus";
-import type { ActivationStatus, AdminRole } from "@prisma/client";
-import { PickWinnersButton } from "./winner/PickWinnersButton";
+import type { ActivationStatus } from "@prisma/client";
 
 interface Props {
   activationId: string;
   activationName: string;
   status: ActivationStatus;
   endsAt: string;
-  userRole: AdminRole;
 }
 
 function formatTimeRemaining(endsAt: string): string {
@@ -56,7 +54,6 @@ export function DashboardClient({
   activationName,
   status,
   endsAt,
-  userRole,
 }: Props) {
   const { data, dataUpdatedAt } = trpcReact.registration.dashboardStats.useQuery(
     { activationId },
@@ -80,8 +77,9 @@ export function DashboardClient({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-end justify-between">
+      {/* Header — title and status badge wrap onto separate lines on mobile
+          so a long activation name + LIVE counter don't get squished together. */}
+      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Dashboard · {status}
@@ -89,33 +87,29 @@ export function DashboardClient({
           <h2 className="text-2xl font-semibold">{activationName}</h2>
         </div>
         <div className="flex items-center gap-3">
-          <PickWinnersButton
-            activationId={activationId}
-            activationStatus={status}
-            userRole={userRole}
-          />
-          <a
-            href={`/api/admin/registrations/export?activationId=${activationId}`}
-            download
-            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Download CSV
-          </a>
           <Badge className={statusBadgeClass(status)}>
             {status === "LIVE"
               ? `● LIVE${formatTimeRemaining(endsAt)}`
               : status}
           </Badge>
-          {dataUpdatedAt > 0 && (
-            <span className="text-xs text-muted-foreground">
-              Updated {secondsSince}s ago
-            </span>
-          )}
         </div>
       </div>
 
-      {/* KPI tiles */}
-      <div className="flex gap-3">
+      {/* Live freshness indicator — kept on its own row so its width changes
+          (1s → 10s → 100s) don't shift the header buttons next to it. */}
+      {dataUpdatedAt > 0 && (
+        <div className="flex justify-end">
+          <span
+            className="text-xs text-muted-foreground tabular-nums"
+            aria-live="polite"
+          >
+            Updated {secondsSince}s ago
+          </span>
+        </div>
+      )}
+
+      {/* KPI tiles — 2-up on mobile, 4-up on sm+ so values stay readable */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KpiTile
           label="Verified"
           value={data?.verified ?? "—"}
@@ -146,10 +140,11 @@ export function DashboardClient({
         />
       </div>
 
-      {/* Charts row */}
-      <div className="flex gap-3">
+      {/* Charts row — stacked on mobile/tablet, side-by-side on lg+ where the
+          sparkline has enough width to render axis labels without overlap. */}
+      <div className="flex flex-col gap-3 lg:flex-row">
         {/* Sparkline */}
-        <div className="flex-[2] rounded-md border p-4">
+        <div className="rounded-md border p-4 lg:flex-[2]">
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Verifications · last 60m
           </p>
@@ -198,7 +193,7 @@ export function DashboardClient({
         </div>
 
         {/* Per-booth bars */}
-        <div className="flex-1 rounded-md border p-4">
+        <div className="rounded-md border p-4 lg:flex-1">
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             By booth
           </p>

@@ -37,10 +37,11 @@ export default async function DashboardPage({
           activationName={activation.name}
           status={activation.status}
           endsAt={activation.endsAt.toISOString()}
-          userRole={userRole}
         />
         <RegistrationsTable
           activationId={activation.id}
+          activationStatus={activation.status}
+          userRole={userRole}
           consentItems={activation.consentItems}
           mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
           entryCodePrefix={activation.entryCodePrefix}

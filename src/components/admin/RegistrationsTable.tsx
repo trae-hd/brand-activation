@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { trpcReact } from "@/lib/trpc/react";
 import { Input } from "@/components/ui/input";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
-import type { MrqAccountStatus } from "@prisma/client";
+import type { ActivationStatus, AdminRole, MrqAccountStatus } from "@prisma/client";
+import { PickWinnersButton } from "./winner/PickWinnersButton";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
@@ -121,6 +122,8 @@ function MrqAccountBadge({ status }: { status: MrqAccountStatus }) {
 
 interface Props {
   activationId: string;
+  activationStatus: ActivationStatus;
+  userRole: AdminRole;
   consentItems: unknown;
   mrqContactConsentEnabled: boolean;
   /** Entry-code prefix for this activation, e.g. "WC". Used as a non-editable
@@ -131,6 +134,8 @@ interface Props {
 
 export function RegistrationsTable({
   activationId,
+  activationStatus,
+  userRole,
   consentItems,
   mrqContactConsentEnabled,
   entryCodePrefix,
@@ -225,12 +230,13 @@ export function RegistrationsTable({
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header — mobile-first: title sits on its own row on narrow screens
+          and actions wrap below; on sm+ they share the row with justify-between. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-xl font-semibold">
           Registrations{total != null ? ` · ${total}` : ""}
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {items.length > 0 && (
             <button
               onClick={handleToggleRevealAll}
@@ -260,20 +266,30 @@ export function RegistrationsTable({
               ? `✓ Checked ${enrichMutation.data.enriched}`
               : "Check MRQ accounts"}
           </button>
-          {lastEnrichedAt && !enrichMutation.isPending && (
-            <span className="text-xs text-muted-foreground/60">
-              Last checked {fmtDate(lastEnrichedAt)}
-            </span>
-          )}
           <a
             href={`/api/admin/registrations/export?activationId=${activationId}${mrqConsentFilter === true ? "&mrqContactConsent=true" : ""}`}
             download
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            CSV ↓
+            <DynamicIcon name="Download" className="h-3.5 w-3.5" />
+            Download CSV
           </a>
+          <PickWinnersButton
+            activationId={activationId}
+            activationStatus={activationStatus}
+            userRole={userRole}
+          />
         </div>
       </div>
+
+      {/* Last-enriched indicator — separated onto its own row so its
+          variable-width datetime doesn't shift the action buttons next to it
+          when it appears/changes. Right-aligned to align with action group. */}
+      {lastEnrichedAt && !enrichMutation.isPending && (
+        <p className="text-xs text-muted-foreground/60 text-right">
+          Last checked {fmtDate(lastEnrichedAt)}
+        </p>
+      )}
 
       {/* Filter pills + search */}
       <div className="flex flex-wrap items-center gap-2">
@@ -363,9 +379,7 @@ export function RegistrationsTable({
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">MRQ account</th>
               <th className="px-4 py-3 text-left font-medium">MRQ joined</th>
-              <th className="px-4 py-3">
-                <span className="sr-only">Reveal email</span>
-              </th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>

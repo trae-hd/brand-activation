@@ -106,6 +106,13 @@ import {
   Flag,
   Save,
   GitBranch,
+  BellRing,
+  FilePlus,
+  UserX,
+  Star,
+  Ban,
+  Filter,
+  Download,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -223,6 +230,13 @@ export const icons = createIconMap({
   Flag,
   Save,
   GitBranch,
+  BellRing,
+  FilePlus,
+  UserX,
+  Star,
+  Ban,
+  Filter,
+  Download,
 });
 
 /** Union of all valid icon names in the registry. */

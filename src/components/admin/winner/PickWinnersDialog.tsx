@@ -267,10 +267,7 @@ export function PickWinnersDialog({
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="reserveCount" className="text-xs">
-                    Number of reserves{" "}
-                    <span className="text-muted-foreground/60 font-normal">
-                      (default {defaultReserves(winnerCount)})
-                    </span>
+                    Number of reserves
                   </Label>
                   <Input
                     id="reserveCount"
@@ -289,6 +286,9 @@ export function PickWinnersDialog({
                     }}
                     className="h-9 text-sm"
                   />
+                  <span className="text-muted-foreground/60 text-[10px] font-normal">
+                    Default {defaultReserves(winnerCount)}
+                  </span>
                 </div>
               </div>
 
