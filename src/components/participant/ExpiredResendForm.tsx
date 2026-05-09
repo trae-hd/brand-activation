@@ -18,6 +18,7 @@ export function ExpiredResendForm({
   const router = useRouter();
   const [email, setEmail] = useState(defaultEmail);
   const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const submit = () => {
@@ -50,16 +51,64 @@ export function ExpiredResendForm({
           return;
         }
         const { pendingToken } = (await res.json()) as { pendingToken: string };
+        // Seed every session key /verify will read on mount. Direct navigation
+        // to /expired (without going through /register first this tab) means
+        // these may be missing — we fill them in here so /verify's resend button
+        // works without needing a round-trip back to the landing page.
+        sessionStorage.setItem(`mrq:pendingToken:${activationSlug}`, pendingToken);
+        sessionStorage.setItem(`mrq:activationId:${activationSlug}`, activationId);
+        sessionStorage.setItem(`mrq:email:${activationSlug}`, email);
+        sessionStorage.setItem(`mrq:consentVersion:${activationSlug}`, consentVersion);
         sessionStorage.setItem(
-          `mrq:pendingToken:${activationSlug}`,
-          pendingToken
+          `mrq:mrqContactConsent:${activationSlug}`,
+          mrqContactConsent ? "1" : "0",
         );
-        router.push(`/${activationSlug}/verify`);
+        // Show the helpful post-submit panel rather than auto-redirecting.
+        // The participant chooses whether to continue to /verify (new code
+        // path) or stay here to check their original confirmation email
+        // (already-verified path). This closes the "no code arrives → user
+        // sits on /verify forever" dead-end loop without leaking which branch
+        // applies via the HTTP response — see thread on response opacity vs
+        // observable side-channels.
+        setSubmitted(true);
       } catch {
         setError("Network error. Please try again.");
       }
     });
   };
+
+  // ── Post-submit confirmation panel ─────────────────────────────────
+  // Same response shape covers both "fresh code issued" and "no-op because
+  // already verified". The copy is observability-gated: a stranger without
+  // inbox access learns nothing they couldn't already learn from the rate
+  // limiter; a legitimate user with inbox access can read it and decide.
+  if (submitted) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm leading-relaxed">
+          If a new code is required, it will arrive shortly. If you have
+          already verified your email, your original entry code is still
+          active — please check your confirmation email from us.
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push(`/${activationSlug}/verify`)}
+          className="w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+        >
+          Enter your new code →
+        </button>
+        <p className="text-xs text-ink-3">
+          Need help?{" "}
+          <a
+            href="mailto:hello@mrqlive.com"
+            className="underline underline-offset-2"
+          >
+            hello@mrqlive.com
+          </a>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

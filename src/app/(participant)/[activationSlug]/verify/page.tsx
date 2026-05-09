@@ -56,6 +56,11 @@ export default function VerifyPage() {
     typeof window !== "undefined" ? !navigator.onLine : false
   );
   const [isResending, setIsResending] = useState(false);
+  // Toggled true after the first successful resend click. Surfaces a hint
+  // explaining the two possible outcomes so participants who are already
+  // verified (and will never receive a fresh email) can self-diagnose
+  // without leaking enumeration signal via the API response.
+  const [resentAtLeastOnce, setResentAtLeastOnce] = useState(false);
 
   // Redirect to landing if no token.
   useEffect(() => {
@@ -164,6 +169,7 @@ export default function VerifyPage() {
       sessionStorage.setItem(`mrq:pendingToken:${activationSlug}`, pendingToken);
       setSecondsLeft(OTP_TTL_SECONDS);
       setOtp("");
+      setResentAtLeastOnce(true);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -227,6 +233,22 @@ export default function VerifyPage() {
           Wrong email?
         </a>
       </div>
+
+      {resentAtLeastOnce && (
+        <p className="mt-3 text-center text-xs text-ink-3 leading-relaxed">
+          If a new code is required, it will arrive shortly. If you have
+          already verified your email, your original entry code is still
+          active — please check your confirmation email from us.
+          <br />
+          Need help?{" "}
+          <a
+            href="mailto:hello@mrqlive.com"
+            className="underline underline-offset-2"
+          >
+            hello@mrqlive.com
+          </a>
+        </p>
+      )}
 
       <button
         type="button"
