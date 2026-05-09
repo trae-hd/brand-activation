@@ -78,6 +78,7 @@ const SECTIONS = [
   { id: "going-live", label: "Going live" },
   { id: "dashboard", label: "Reading the dashboard" },
   { id: "mrq-enrichment", label: "MRQ account enrichment" },
+  { id: "winner-picking", label: "Picking winners" },
   { id: "data-retention", label: "Data, retention & DSAR" },
   { id: "glossary", label: "Glossary" },
 ];
@@ -828,7 +829,151 @@ by a member of the MrQ team (mrq.com)."`}</Formula>
           </Section>
 
           {/* 13 */}
-          <Section id="data-retention" title="13. Data, retention & DSAR">
+          <Section id="winner-picking" title="13. Picking winners">
+            <p>
+              For activations that hand out prizes, ADMINs can run a randomised, auditable
+              draw from the dashboard. The draw uses a cryptographic seed and a Postgres-side
+              shuffle so the result is reproducible for audit. Each draw produces a set of
+              <strong> winners</strong> plus a small set of <strong>reserves</strong> (next-in-line)
+              in a single shuffle, so winner replacement when needed doesn&apos;t require a fresh draw.
+            </p>
+
+            <SubSection title="Eligibility — who can be picked">
+              <p>
+                A registration is eligible for selection only if <strong>all</strong> of the following are true:
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Registration status is <code>VERIFIED</code> (pending and expired entries never participate).</li>
+                <li>The participant ticked <strong>&ldquo;agree to be contacted by MrQ&rdquo;</strong> at registration. We can&apos;t legally contact someone about winning if they didn&apos;t consent.</li>
+                <li>The registration is <strong>not excluded</strong> (the <code>excluded</code> flag on the registration row, set manually by an admin via Prisma Studio in v1).</li>
+                <li>The registration was verified <strong>before the eligibility cutoff</strong> for the draw. ENDED activations default to <code>endsAt</code>; LIVE activations default to the timestamp the draw was triggered.</li>
+                <li>The registration <strong>has not been on a previous draw for this activation</strong>, regardless of status. Disqualified registrations cannot be re-picked in a later draw — this prevents redrawing until a preferred outcome.</li>
+              </ul>
+              <p>
+                Optionally, the draw can be filtered to <strong>only registrations with an active MrQ account</strong>
+                (a toggle in the Pick Winners modal, default off).
+              </p>
+            </SubSection>
+
+            <SubSection title="The algorithm">
+              <p>
+                The draw is <strong>deterministic given the seed</strong>. When you click &ldquo;Draw winners&rdquo;,
+                the system:
+              </p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Generates a fresh 32-byte cryptographic seed (one-time, server-side, never returned to the browser).</li>
+                <li>Snapshots the eligible-pool registration IDs at draw time (preserved even if a participant is later erased — see Audit trail below).</li>
+                <li>Computes a SHA-256 hash over <code>seed + drawId + registrationId</code> for every eligible row.</li>
+                <li>Sorts by that hash and takes the top N+M rows.</li>
+                <li>Positions 1..N are <strong>winners</strong>; positions N+1..N+M are <strong>reserves</strong>.</li>
+              </ol>
+              <p>
+                Because the seed is stored alongside the draw, an auditor can re-run the same hash over the
+                snapshotted pool and confirm the result. The seed itself is server-side audit material —
+                not exposed to admins through the UI.
+              </p>
+            </SubSection>
+
+            <SubSection title="Reserves">
+              <p>
+                Reserves are drawn at the same time as winners, in the same shuffle. They&apos;re ranked
+                (position N+1 = topmost, etc.). When a winner is later disqualified, the topmost reserve
+                is automatically promoted to winner (their type flips, their position is preserved).
+                The original randomness is preserved without a new draw event.
+              </p>
+              <p>
+                <strong>Default reserve count:</strong> <code>max(2, ceil(winners × 0.2))</code>. Admins can
+                override it in the modal — set to 0 for no reserves at all, or higher for more cushion on
+                large draws.
+              </p>
+            </SubSection>
+
+            <SubSection title="Disqualification + promotion">
+              <p>
+                Each row in the persistent Winners section has a Disqualify button (ADMIN-only).
+                Disqualifying a winner runs in a single transaction:
+              </p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>The selection is marked <code>DISQUALIFIED</code> with the actor + reason + timestamp recorded.</li>
+                <li>If the disqualified row was a <strong>winner</strong>, the topmost <code>SELECTED</code> reserve in the same draw is promoted (its type changes from <code>RESERVE</code> to <code>WINNER</code> and a <code>promotedFromReserveAt</code> timestamp is set).</li>
+                <li>If no eligible reserve exists, the slot stays unfilled — start a fresh draw to backfill.</li>
+                <li>If the disqualified row was a <strong>reserve</strong>, no promotion happens. Reserves don&apos;t auto-shuffle each other in v1.</li>
+              </ol>
+              <p>
+                A required reason field on the dialog forces a brief explanation that lands in the audit
+                log. The disqualified row stays visible on the Winners view with its actor + relative
+                timestamp inline beneath the action column.
+              </p>
+            </SubSection>
+
+            <SubSection title="Notification log">
+              <p>
+                Both ADMIN and MEMBER users can mark a winner as <strong>notified</strong> after they&apos;ve made
+                contact (called, emailed, spoken in person). Each notification records the actor + timestamp.
+                Notes can be edited after the initial mark via the Edit notes button — the audit log
+                captures the length-delta on every edit (we store length only, not content, because notes
+                may contain participant PII like phone numbers and call summaries).
+              </p>
+              <p>
+                Notes use a <strong>Last Write Wins</strong> model. If two admins edit the same row at the
+                same time, the second save overwrites the first. Recovery path: query the audit log for
+                <code>winner.selection.notes_updated</code> entries, which preserve the length-deltas
+                so you can spot &ldquo;47 chars became 23 chars&rdquo; collisions.
+              </p>
+            </SubSection>
+
+            <SubSection title="Permissions">
+              <p>Who can do what:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>Pick winners (start a draw)</strong> — ADMIN only.</li>
+                <li><strong>Disqualify a selection</strong> — ADMIN only.</li>
+                <li><strong>Promote a reserve</strong> — Automatic on winner disqualification. There&apos;s no manual promote action.</li>
+                <li><strong>Mark notified, edit notification notes</strong> — ADMIN + MEMBER. Marketing-ops MEMBERs typically run the outreach.</li>
+                <li><strong>View previous draws + selections</strong> — ADMIN + MEMBER.</li>
+                <li><strong>Reveal individual emails</strong> — ADMIN + MEMBER, audit-logged on each reveal.</li>
+                <li><strong>Bulk-copy winner emails</strong> — ADMIN only. Bulk copy is the leakiest action surface; restricting it to ADMINs forces MEMBERs to reveal-and-copy individually, which adds friction that meaningfully reduces data-exfiltration risk.</li>
+              </ul>
+            </SubSection>
+
+            <SubSection title="Audit trail">
+              <p>Every winner-picking action writes a SECURITY-class or ADMIN-class row to the audit log:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><code>winner.draw.created</code> — when a draw is run. Captures activationId, counts, MrQ-only flag, eligible pool size, eligibility cutoff. Seed is on the WinnerDraw row itself, queryable via join.</li>
+                <li><code>winner.selection.disqualified</code> — when a row is disqualified. Captures the reason.</li>
+                <li><code>winner.selection.promoted</code> — when a reserve is auto-promoted following disqualification. Captures the from/to positions and the replaced selection&apos;s ID.</li>
+                <li><code>winner.selection.notified</code> — when a row is marked as notified.</li>
+                <li><code>winner.selection.notes_updated</code> — when notes are edited. Captures previous length and new length. <strong>Never the content.</strong></li>
+                <li><code>winner.draw.bulk_email_copied</code> — when an admin clicks &ldquo;Copy winner emails&rdquo;.</li>
+              </ul>
+              <p>
+                <strong>Reproducibility under erasure:</strong> if a participant exercises right to erasure
+                after a draw, the WinnerDrawSelection and WinnerDrawPoolEntry rows have their
+                <code> registrationId</code> set to NULL — the position in the shuffle is preserved
+                so the audit narrative becomes &ldquo;position 4 was an eligible registration that has
+                since been erased&rdquo; rather than the position disappearing.
+              </p>
+            </SubSection>
+
+            <SubSection title="What's not yet supported">
+              <p>The following are deliberate v1 trade-offs. Each is on the roadmap if it becomes useful.</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>UI for excluding participants</strong> — the <code>excluded</code> flag exists on the registration row but there&apos;s no button to flip it. Use Prisma Studio for now. A 🚫 indicator on the registrations table confirms the flag is set.</li>
+                <li><strong>Auto-emailing winners</strong> — admin-driven for v1 (the &ldquo;Copy winner emails&rdquo; button gives you a clean newline-separated list to paste into your mail tool of choice). Auto-email needs a templating story we&apos;ve not yet scoped.</li>
+                <li><strong>Cross-activation rules</strong> — &ldquo;exclude past winners across activations&rdquo; isn&apos;t enforced. A previous winner is eligible for a fresh activation; if the team wants to enforce that across activations, surface it as a feature request.</li>
+                <li><strong>Real-time conflict detection on note edits</strong> — Last Write Wins. Conflict resolution becomes worth building when we observe friction.</li>
+              </ul>
+            </SubSection>
+
+            <Callout type="warning">
+              Once a registration is on a draw for an activation — winner, reserve, or disqualified —
+              they cannot be picked in a later draw on the same activation. This prevents
+              &ldquo;redrawing until a preferred outcome&rdquo; and is enforced at two layers
+              (the eligibility filter + a database unique constraint).
+            </Callout>
+          </Section>
+
+          {/* 14 */}
+          <Section id="data-retention" title="14. Data, retention & DSAR">
             <p>
               The platform captures only the minimum data required for a promotional sign-up:
               email address, booth code, UTM parameters, consent version, and timestamps. Email
@@ -876,8 +1021,8 @@ by a member of the MrQ team (mrq.com)."`}</Formula>
             </Callout>
           </Section>
 
-          {/* 14 */}
-          <Section id="glossary" title="14. Glossary">
+          {/* 15 */}
+          <Section id="glossary" title="15. Glossary">
             <dl className="space-y-2">
               {[
                 ["Activation", "A single promotional event managed by the platform."],

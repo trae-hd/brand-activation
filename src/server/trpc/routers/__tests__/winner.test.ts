@@ -1068,3 +1068,132 @@ describe("winner.copyEmails", () => {
     expect(JSON.stringify(auditArg.metadata)).not.toContain("@example.com");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 6 edge cases
+//
+// Three of the five edge cases listed in §2.6 (zero pool, all-eligible-become-
+// winners, one-winner-rest-reserves) are unit-testable with mocked Prisma.
+// The remaining two (concurrent-draws unique-constraint enforcement, erasure
+// FK SetNull behaviour) are properties of Postgres + the schema, not the
+// procedure code; they're covered by the staging integration check in the
+// Phase 6 verification list — not here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("winner.pickWinners — edge cases", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubAdminUser();
+    stubTransaction();
+  });
+
+  it("rejects a draw when the eligible pool is empty (BAD_REQUEST)", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1",
+      status: "ENDED",
+      endsAt: new Date(),
+    });
+    mockRegistrationCount.mockResolvedValueOnce(0); // empty pool
+
+    const caller = await makeWinnerCaller();
+    await expect(
+      caller.pickWinners({
+        activationId: "act-1",
+        winnerCount: 1,
+        reserveCount: 0,
+        phrase: "DRAW",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    // Mutation must short-circuit before opening a transaction
+    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockWinnerDrawCreate).not.toHaveBeenCalled();
+  });
+
+  it("supports winnerCount === poolSize, reserveCount === 0 (every eligible becomes a winner)", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1",
+      status: "ENDED",
+      endsAt: new Date(),
+    });
+    mockRegistrationCount.mockResolvedValueOnce(3); // pool of 3
+    mockWinnerDrawCreate.mockResolvedValueOnce({ id: "draw-1" });
+    mockExecuteRaw.mockResolvedValueOnce(3);
+    mockQueryRaw.mockResolvedValueOnce([
+      { id: "reg-a", pos: 1 },
+      { id: "reg-b", pos: 2 },
+      { id: "reg-c", pos: 3 },
+    ]);
+    mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 3 });
+    mockSelectionFindMany.mockResolvedValueOnce([
+      fakeSelection(1, "WINNER"),
+      fakeSelection(2, "WINNER"),
+      fakeSelection(3, "WINNER"),
+    ]);
+
+    const caller = await makeWinnerCaller();
+    const result = await caller.pickWinners({
+      activationId: "act-1",
+      winnerCount: 3,
+      reserveCount: 0,
+      phrase: "DRAW",
+    });
+
+    expect(result.winnerCount).toBe(3);
+    expect(result.reserveCount).toBe(0);
+    expect(result.eligiblePoolSize).toBe(3);
+    expect(result.selections).toHaveLength(3);
+
+    // Confirm createMany received 3 rows, all type WINNER
+    const createManyArg = mockWinnerDrawSelectionCreateMany.mock.calls[0][0];
+    expect(createManyArg.data).toHaveLength(3);
+    expect(createManyArg.data.every((r: { type: string }) => r.type === "WINNER")).toBe(
+      true,
+    );
+  });
+
+  it("supports winnerCount === 1, reserveCount === poolSize - 1 (one winner, everyone else reserve)", async () => {
+    mockActivationFindUnique.mockResolvedValueOnce({
+      id: "act-1",
+      status: "ENDED",
+      endsAt: new Date(),
+    });
+    mockRegistrationCount.mockResolvedValueOnce(5); // pool of 5
+    mockWinnerDrawCreate.mockResolvedValueOnce({ id: "draw-1" });
+    mockExecuteRaw.mockResolvedValueOnce(5);
+    mockQueryRaw.mockResolvedValueOnce(
+      Array.from({ length: 5 }, (_, i) => ({
+        id: `reg-${i + 1}`,
+        pos: i + 1,
+      })),
+    );
+    mockWinnerDrawSelectionCreateMany.mockResolvedValueOnce({ count: 5 });
+    mockSelectionFindMany.mockResolvedValueOnce([
+      fakeSelection(1, "WINNER"),
+      fakeSelection(2, "RESERVE"),
+      fakeSelection(3, "RESERVE"),
+      fakeSelection(4, "RESERVE"),
+      fakeSelection(5, "RESERVE"),
+    ]);
+
+    const caller = await makeWinnerCaller();
+    const result = await caller.pickWinners({
+      activationId: "act-1",
+      winnerCount: 1,
+      reserveCount: 4,
+      phrase: "DRAW",
+    });
+
+    expect(result.winnerCount).toBe(1);
+    expect(result.reserveCount).toBe(4);
+
+    const createManyArg = mockWinnerDrawSelectionCreateMany.mock.calls[0][0];
+    expect(createManyArg.data).toHaveLength(5);
+    expect(createManyArg.data[0]).toMatchObject({ position: 1, type: "WINNER" });
+    expect(
+      createManyArg.data
+        .slice(1)
+        .every((r: { type: string }) => r.type === "RESERVE"),
+    ).toBe(true);
+  });
+});
