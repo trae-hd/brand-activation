@@ -9,6 +9,7 @@ import { complianceRouter } from "./routers/compliance";
 import { settingsRouter } from "./routers/settings";
 import { feedbackRouter } from "./routers/feedback";
 import { helpRouter } from "./routers/help";
+import { winnerRouter } from "./routers/winner";
 
 export const appRouter = router({
   activation: activationRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   settings: settingsRouter,
   feedback: feedbackRouter,
   help: helpRouter,
+  winner: winnerRouter,
 });
 
 export type AppRouter = typeof appRouter;
