@@ -5,11 +5,19 @@ import { AuditClient } from "./AuditClient";
 import type { AuditRowDisplay } from "./AuditClient";
 
 const TAKE = 500;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Hoisted out of the component body so `react-hooks/purity` doesn't fire
+ * on `Date.now()` inside what is technically a server component (one-shot
+ * per request, never re-rendered, but ESLint can't reliably tell). */
+function sevenDaysAgo(): Date {
+  return new Date(Date.now() - SEVEN_DAYS_MS);
+}
 
 export default async function AuditPage() {
   await requireRole("ANY");
 
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const since = sevenDaysAgo();
 
   const rows = await prisma.auditLog.findMany({
     where: { createdAt: { gte: since } },

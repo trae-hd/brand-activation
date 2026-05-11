@@ -109,7 +109,14 @@ export function StatusTransitionDialog({
   const availableTargets = ALLOWED_TRANSITIONS[currentStatus];
   const transitionKey = selectedTo ? `${currentStatus}→${selectedTo}` : null;
   const requiredPhrase = transitionKey ? (PHRASE_GATES[transitionKey] ?? null) : null;
-  const now = Date.now();
+  // Capture `now` once at mount via the useState initializer (which `react-
+  // hooks/purity` explicitly permits for non-deterministic setup) instead
+  // of reading `Date.now()` directly during render. Matches the existing
+  // behaviour: this dialog is transient, the gating is human-scale
+  // (5-minute windows around activation start/end), and a tiny drift
+  // between renders has no operational impact. If you ever need this to
+  // tick live as time passes, add a useEffect + setInterval to bump state.
+  const [now] = useState(() => Date.now());
 
   const isReviewApproved = reviewStatus === "APPROVED";
   const canSubmitForReview =
