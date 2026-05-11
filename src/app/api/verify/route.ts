@@ -8,6 +8,9 @@ import { hmac } from "@/lib/crypto/hmac";
 import { verifyPendingToken } from "@/lib/otp/pendingToken";
 import { consumeOtp, incrementAttempts } from "@/lib/otp/verify";
 import { generateEntryCodeSuffix } from "@/lib/compliance/constants";
+import { emailProvider } from "@/lib/email/provider";
+import { writeAuditLog } from "@/lib/audit/writeAuditLog";
+import { env } from "@/lib/env";
 
 const Body = z.object({
   pendingToken: z.string().min(1),
@@ -60,15 +63,21 @@ export async function POST(req: Request) {
 
     await consumeOtp(decoded.registrationId, { peek: false });
 
-    // Fetch activation prefix to determine if an entry code should be generated.
+    // Fetch activation prefix + the fields needed to compose the post-verify
+    // confirmation email. The reg fetch also captures `confirmationEmailSentAt`
+    // as a paranoia idempotency guard against re-entry races on the OTP gate.
     const reg = await prisma.registration.findUnique({
       where: { id: decoded.registrationId },
-      select: { activationId: true },
+      select: {
+        activationId: true,
+        email: true,
+        confirmationEmailSentAt: true,
+      },
     });
     const activation = reg
       ? await prisma.activation.findUnique({
           where: { id: reg.activationId },
-          select: { entryCodePrefix: true },
+          select: { entryCodePrefix: true, name: true, endsAt: true },
         })
       : null;
 
@@ -100,6 +109,77 @@ export async function POST(req: Request) {
         where: { id: decoded.registrationId },
         data: { status: "VERIFIED", verifiedAt: new Date() },
       });
+    }
+
+    // ── Post-verify audit + confirmation email ────────────────────────────
+    // The route is past the point of no return for the user — the registration
+    // is VERIFIED in the DB. Audit + email are best-effort and never roll back
+    // the verification or alter the response shape.
+    if (reg) {
+      const emailHash = hmac.email(reg.email);
+
+      await writeAuditLog({
+        category: "ADMIN",
+        action: "participant.verified",
+        targetType: "Registration",
+        targetId: decoded.registrationId,
+        metadata: {
+          emailHash,
+          entryCode: entryCode ?? null,
+        },
+        ipHash,
+      });
+
+      // Only send when there's an entry code to convey AND we haven't already
+      // sent for this row. `confirmationEmailSentAt` is read pre-update so a
+      // re-entry race on the OTP gate (Redis DEL is non-atomic with the email
+      // send) doesn't double-send.
+      if (entryCode && reg.confirmationEmailSentAt === null && activation) {
+        const supportEmail = env.SUPPORT_EMAIL ?? env.EMAIL_FROM;
+        const result = await emailProvider.sendEntryCodeConfirmation({
+          to: reg.email,
+          entryCode,
+          activationName: activation.name,
+          activationEndsAt: activation.endsAt,
+          supportEmail,
+        });
+
+        if (result.ok) {
+          await prisma.registration.update({
+            where: { id: decoded.registrationId },
+            data: { confirmationEmailSentAt: new Date() },
+          });
+          await writeAuditLog({
+            category: "ADMIN",
+            action: "participant.confirmation_email_sent",
+            targetType: "Registration",
+            targetId: decoded.registrationId,
+            metadata: {
+              emailHash,
+              resendMessageId: result.messageId,
+              cause: "verify",
+            },
+            ipHash,
+          });
+        } else {
+          // The Phase 1 provider can't yet distinguish 4xx (rejected) vs 5xx
+          // (transient) — both surface as { ok: false, reason: "send-failed" }.
+          // Default to "transient" until the provider classifies its errors.
+          await writeAuditLog({
+            category: "ADMIN",
+            action: "participant.confirmation_email_failed",
+            targetType: "Registration",
+            targetId: decoded.registrationId,
+            metadata: {
+              emailHash,
+              reason: "transient",
+              attempts: 2,
+              cause: "verify",
+            },
+            ipHash,
+          });
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, ...(entryCode ? { entryCode } : {}) });

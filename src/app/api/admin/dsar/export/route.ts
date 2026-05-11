@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       const encoder = new TextEncoder();
       controller.enqueue(
         encoder.encode(
-          "id,activationName,activationSlug,status,boothCode,utmSource,utmMedium,utmCampaign,consentVersion,consentAcceptedAt,registeredAt,verifiedAt\n"
+          "id,activationName,activationSlug,status,boothCode,utmSource,utmMedium,utmCampaign,consentVersion,consentAcceptedAt,registeredAt,verifiedAt,confirmationEmailSentAt\n"
         )
       );
 
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
               consentAcceptedAt: true,
               registeredAt: true,
               verifiedAt: true,
+              confirmationEmailSentAt: true,
               activation: { select: { name: true, slug: true } },
             },
           });
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
                   r.consentAcceptedAt.toISOString(),
                   r.registeredAt.toISOString(),
                   r.verifiedAt?.toISOString() ?? "",
+                  r.confirmationEmailSentAt?.toISOString() ?? "",
                 ])
               )
             );

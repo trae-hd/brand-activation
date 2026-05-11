@@ -6,13 +6,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createHmac } from "crypto";
 
 vi.mock("@/lib/env", () => ({
   env: {
     NODE_ENV: "test",
     OTP_HMAC_KEY: "test-otp-key-ccccccccccccccccccccccccccccccc",
     IP_HMAC_KEY: "test-ip-key-dddddddddddddddddddddddddddddddd",
+    EMAIL_HASH_HMAC_KEY: "test-email-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     PENDING_TOKEN_SECRET: "test-pending-secret-eeeeeeeeeeeeeeeeeeeeeeeeee",
+    EMAIL_FROM: "noreply@mrqlive.co.uk",
+    SUPPORT_EMAIL: "hello@mrqlive.com",
   },
 }));
 
@@ -39,10 +43,31 @@ vi.mock("@/lib/otp/verify", () => ({
 }));
 
 const mockRegistrationUpdate = vi.fn();
+const mockRegistrationFindUnique = vi.fn();
+const mockActivationFindUnique = vi.fn();
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    registration: { update: (...args: unknown[]) => mockRegistrationUpdate(...args) },
+    registration: {
+      update: (...args: unknown[]) => mockRegistrationUpdate(...args),
+      findUnique: (...args: unknown[]) => mockRegistrationFindUnique(...args),
+    },
+    activation: {
+      findUnique: (...args: unknown[]) => mockActivationFindUnique(...args),
+    },
   },
+}));
+
+const mockSendEntryCodeConfirmation = vi.fn();
+vi.mock("@/lib/email/provider", () => ({
+  emailProvider: {
+    sendEntryCodeConfirmation: (...args: unknown[]) =>
+      mockSendEntryCodeConfirmation(...args),
+  },
+}));
+
+const mockWriteAuditLog = vi.fn();
+vi.mock("@/lib/audit/writeAuditLog", () => ({
+  writeAuditLog: (...args: unknown[]) => mockWriteAuditLog(...args),
 }));
 
 // withRedisHealth delegates directly to the handler for these tests.
@@ -78,6 +103,7 @@ describe("/api/verify — shape parity", () => {
     allowRateLimits();
     mockIncrementAttempts.mockResolvedValue(undefined);
     mockRegistrationUpdate.mockResolvedValue({});
+    mockWriteAuditLog.mockResolvedValue(undefined);
   });
 
   it("returns 400 for malformed body (missing otp)", async () => {
@@ -167,5 +193,158 @@ describe("/api/verify — shape parity", () => {
 
     const res = await callPost(makeRequest({ pendingToken: "t.s", otp: "123456" }));
     expect(res.status).toBe(503);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Phase 2: post-verify confirmation email + audit-row coverage.
+// ──────────────────────────────────────────────────────────────────────
+
+const OTP = "123456";
+const STORED_OTP_HASH = createHmac(
+  "sha256",
+  "test-otp-key-ccccccccccccccccccccccccccccccc",
+)
+  .update(OTP)
+  .digest("hex");
+
+function setupHappyPathVerifyMocks(opts: {
+  confirmationEmailSentAt?: Date | null;
+  entryCodePrefix?: string | null;
+} = {}) {
+  const confirmationEmailSentAt = opts.confirmationEmailSentAt ?? null;
+  const entryCodePrefix = opts.entryCodePrefix === undefined ? "WEM" : opts.entryCodePrefix;
+
+  mockVerifyPendingToken.mockReturnValue({ kind: "issued", registrationId: "reg-1" });
+  mockConsumeOtp.mockImplementation(async (_id: string, args: { peek: boolean }) => {
+    if (args.peek) return { otpHash: STORED_OTP_HASH, attempts: 0 };
+    return null; // burn
+  });
+  mockRegistrationFindUnique.mockResolvedValue({
+    activationId: "act-1",
+    email: "punter@example.com",
+    confirmationEmailSentAt,
+  });
+  mockActivationFindUnique.mockResolvedValue({
+    entryCodePrefix,
+    name: "Wembley Live Test",
+    endsAt: new Date("2026-07-31T17:00:00Z"),
+  });
+}
+
+describe("/api/verify — post-verify audit + email", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    setupRedis();
+    allowRateLimits();
+    mockIncrementAttempts.mockResolvedValue(undefined);
+    mockRegistrationUpdate.mockResolvedValue({});
+    mockWriteAuditLog.mockResolvedValue(undefined);
+  });
+
+  it("happy path: writes participant.verified, sends email, sets confirmationEmailSentAt, writes _sent audit", async () => {
+    setupHappyPathVerifyMocks();
+    mockSendEntryCodeConfirmation.mockResolvedValue({ ok: true, messageId: "msg_phase2_ok" });
+
+    const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(typeof json.entryCode).toBe("string");
+    expect(json.entryCode.startsWith("WEM-")).toBe(true);
+
+    // Email sent with the right args
+    expect(mockSendEntryCodeConfirmation).toHaveBeenCalledTimes(1);
+    const sendArgs = mockSendEntryCodeConfirmation.mock.calls[0][0];
+    expect(sendArgs.to).toBe("punter@example.com");
+    expect(sendArgs.activationName).toBe("Wembley Live Test");
+    expect(sendArgs.supportEmail).toBe("hello@mrqlive.com");
+    expect(sendArgs.activationEndsAt).toEqual(new Date("2026-07-31T17:00:00Z"));
+    expect(typeof sendArgs.entryCode).toBe("string");
+
+    // confirmationEmailSentAt update happened (second update call)
+    const sentAtUpdates = mockRegistrationUpdate.mock.calls.filter(
+      (c) => "confirmationEmailSentAt" in (c[0] as { data: object }).data,
+    );
+    expect(sentAtUpdates).toHaveLength(1);
+
+    // Audit rows: participant.verified + participant.confirmation_email_sent
+    const actions = mockWriteAuditLog.mock.calls.map((c) => (c[0] as { action: string }).action);
+    expect(actions).toContain("participant.verified");
+    expect(actions).toContain("participant.confirmation_email_sent");
+    expect(actions).not.toContain("participant.confirmation_email_failed");
+
+    const sentRow = mockWriteAuditLog.mock.calls.find(
+      (c) => (c[0] as { action: string }).action === "participant.confirmation_email_sent",
+    )?.[0] as { metadata: { resendMessageId: string; cause: string }; targetType: string };
+    expect(sentRow.metadata.resendMessageId).toBe("msg_phase2_ok");
+    expect(sentRow.metadata.cause).toBe("verify");
+    expect(sentRow.targetType).toBe("Registration");
+  });
+
+  it("email failure path: writes _failed audit row but response stays 200", async () => {
+    setupHappyPathVerifyMocks();
+    mockSendEntryCodeConfirmation.mockResolvedValue({ ok: false, reason: "send-failed" });
+
+    const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
+
+    expect(res.status).toBe(200);
+
+    // No timestamp update should have run on the failure path.
+    const sentAtUpdates = mockRegistrationUpdate.mock.calls.filter(
+      (c) => "confirmationEmailSentAt" in (c[0] as { data: object }).data,
+    );
+    expect(sentAtUpdates).toHaveLength(0);
+
+    const actions = mockWriteAuditLog.mock.calls.map((c) => (c[0] as { action: string }).action);
+    expect(actions).toContain("participant.verified");
+    expect(actions).toContain("participant.confirmation_email_failed");
+    expect(actions).not.toContain("participant.confirmation_email_sent");
+
+    const failedRow = mockWriteAuditLog.mock.calls.find(
+      (c) => (c[0] as { action: string }).action === "participant.confirmation_email_failed",
+    )?.[0] as { metadata: { reason: string; cause: string; attempts: number } };
+    expect(failedRow.metadata.reason).toBe("transient");
+    expect(failedRow.metadata.cause).toBe("verify");
+    expect(failedRow.metadata.attempts).toBe(2);
+  });
+
+  it("idempotent re-verify: confirmationEmailSentAt non-null suppresses a second send and a second _sent audit row", async () => {
+    setupHappyPathVerifyMocks({ confirmationEmailSentAt: new Date("2026-07-31T16:00:00Z") });
+    mockSendEntryCodeConfirmation.mockResolvedValue({ ok: true, messageId: "should-not-be-called" });
+
+    const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
+
+    expect(res.status).toBe(200);
+    expect(mockSendEntryCodeConfirmation).not.toHaveBeenCalled();
+
+    // No timestamp update on the no-send path.
+    const sentAtUpdates = mockRegistrationUpdate.mock.calls.filter(
+      (c) => "confirmationEmailSentAt" in (c[0] as { data: object }).data,
+    );
+    expect(sentAtUpdates).toHaveLength(0);
+
+    // participant.verified is still written; neither _sent nor _failed.
+    const actions = mockWriteAuditLog.mock.calls.map((c) => (c[0] as { action: string }).action);
+    expect(actions).toContain("participant.verified");
+    expect(actions).not.toContain("participant.confirmation_email_sent");
+    expect(actions).not.toContain("participant.confirmation_email_failed");
+  });
+
+  it("activation without entryCodePrefix: skips the confirmation email entirely (no entry code to convey)", async () => {
+    setupHappyPathVerifyMocks({ entryCodePrefix: null });
+
+    const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ ok: true });
+    expect(mockSendEntryCodeConfirmation).not.toHaveBeenCalled();
+
+    const actions = mockWriteAuditLog.mock.calls.map((c) => (c[0] as { action: string }).action);
+    expect(actions).toContain("participant.verified");
+    expect(actions).not.toContain("participant.confirmation_email_sent");
   });
 });
