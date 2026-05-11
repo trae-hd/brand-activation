@@ -34,6 +34,7 @@ const ARGS = {
   activationName: "Wembley Live Test",
   activationEndsAt: new Date("2026-07-31T17:00:00Z"),
   supportEmail: "hello@mrqlive.com",
+  cause: "verify" as const,
 };
 
 async function loadProvider() {
@@ -65,6 +66,30 @@ describe("resendProvider.sendEntryCodeConfirmation", () => {
     expect(call).not.toHaveProperty("replyTo");
 
     expect(result).toEqual({ ok: true, messageId: "msg_abc123" });
+  });
+
+  it("threads `cause: 'verify'` into the rendered HTML + plaintext", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_cause_verify" }, error: null });
+    const provider = await loadProvider();
+    await provider.sendEntryCodeConfirmation({ ...ARGS, cause: "verify" });
+
+    const call = sendMock.mock.calls[0][0];
+    // React inserts <!-- --> markers around interpolations — match on the
+    // unique non-interpolated phrase rather than across an interpolation.
+    expect(call.html).toContain("registered for");
+    expect(call.html).not.toContain("again, as requested");
+    expect(call.text).toContain("You're registered for Wembley Live Test");
+  });
+
+  it("threads `cause: 'resend'` into the rendered HTML + plaintext", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_cause_resend" }, error: null });
+    const provider = await loadProvider();
+    await provider.sendEntryCodeConfirmation({ ...ARGS, cause: "resend" });
+
+    const call = sendMock.mock.calls[0][0];
+    expect(call.html).toContain("again, as requested");
+    expect(call.html).not.toContain("registered for");
+    expect(call.text).toContain("Here's your entry code again, as requested.");
   });
 
   it("retries once on a transient 5xx and succeeds on the second attempt (attempts: 2)", async () => {

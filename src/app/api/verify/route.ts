@@ -142,6 +142,7 @@ export async function POST(req: Request) {
           activationName: activation.name,
           activationEndsAt: activation.endsAt,
           supportEmail,
+          cause: "verify",
         });
 
         if (result.ok) {

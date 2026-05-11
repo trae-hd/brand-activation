@@ -117,6 +117,7 @@ export async function POST(req: Request) {
         activationName: reg.activation.name,
         activationEndsAt: reg.activation.endsAt,
         supportEmail,
+        cause: "resend",
       });
 
       if (result.ok) {

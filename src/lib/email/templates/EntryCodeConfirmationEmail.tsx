@@ -21,6 +21,18 @@ export interface EntryCodeConfirmationEmailProps {
   activationName: string;
   activationEndsAt: Date;
   supportEmail: string;
+  /**
+   * `'verify'` — initial post-OTP-verification send (default).
+   *   Headline: "You're registered for {activationName}." / "Here's your entry code:"
+   * `'resend'` — on-demand resend triggered from the success-page Resend
+   *   button (or the resend endpoint).
+   *   Headline: "Here's your entry code again, as requested."
+   *
+   * Body otherwise identical between the two — the only difference is the
+   * top headline + subheading, so a participant who clicked Resend isn't
+   * confused by a "you're registered" lede.
+   */
+  cause: "verify" | "resend";
 }
 
 const END_DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
@@ -38,11 +50,15 @@ export function subjectFor(activationName: string): string {
 }
 
 export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
-  const { entryCode, activationName, activationEndsAt, supportEmail } = args;
+  const { entryCode, activationName, activationEndsAt, supportEmail, cause } = args;
+  const headline =
+    cause === "resend"
+      ? `Here's your entry code again, as requested.`
+      : `You're registered for ${activationName}. Here's your entry code:`;
   return [
     `Hi,`,
     ``,
-    `You're registered for ${activationName}. Here's your entry code:`,
+    headline,
     ``,
     entryCode,
     ``,
@@ -62,15 +78,18 @@ export function EntryCodeConfirmationEmail({
   activationName = "Demo Activation",
   activationEndsAt = new Date("2026-12-31T23:59:00Z"),
   supportEmail = "hello@mrqlive.com",
+  cause = "verify",
 }: EntryCodeConfirmationEmailProps) {
   const formattedEndDate = formatActivationEndDate(activationEndsAt);
+  const isResend = cause === "resend";
+  const previewText = isResend
+    ? `Here's your entry code again for ${activationName}: ${entryCode}. Keep this email.`
+    : `Your entry code for ${activationName}: ${entryCode}. Keep this email.`;
 
   return (
     <Html lang="en">
       <Head />
-      <Preview>
-        Your entry code for {activationName}: {entryCode}. Keep this email.
-      </Preview>
+      <Preview>{previewText}</Preview>
       <Body
         style={{ margin: 0, padding: 0, backgroundColor: "#f5f4f0", fontFamily: FONT }}
       >
@@ -135,7 +154,7 @@ export function EntryCodeConfirmationEmail({
                 </Column>
               </Row>
 
-              {/* Body copy */}
+              {/* Body copy — heading + subheading branch on cause. */}
               <Row>
                 <Column style={{ padding: "24px 32px 8px" }}>
                   <Text
@@ -149,19 +168,25 @@ export function EntryCodeConfirmationEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    You&apos;re registered for {activationName}.
+                    {isResend ? (
+                      <>Here&apos;s your entry code again, as requested.</>
+                    ) : (
+                      <>You&apos;re registered for {activationName}.</>
+                    )}
                   </Text>
-                  <Text
-                    style={{
-                      margin: "0 0 24px",
-                      fontSize: 15,
-                      lineHeight: "1.55",
-                      color: "#57534e",
-                      fontFamily: FONT,
-                    }}
-                  >
-                    Here&apos;s your entry code:
-                  </Text>
+                  {!isResend && (
+                    <Text
+                      style={{
+                        margin: "0 0 24px",
+                        fontSize: 15,
+                        lineHeight: "1.55",
+                        color: "#57534e",
+                        fontFamily: FONT,
+                      }}
+                    >
+                      Here&apos;s your entry code:
+                    </Text>
+                  )}
                 </Column>
               </Row>
 

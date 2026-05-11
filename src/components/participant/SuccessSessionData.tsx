@@ -71,7 +71,12 @@ export function SuccessSessionData({
     if (isResending || !activationId || !email || !consentVersion) return;
     setIsResending(true);
     try {
-      const res = await fetch("/api/register", {
+      // Phase 5 of POST_VERIFY_EMAIL_PROMPT_V1.5: rewired from /api/register
+      // (which no-op'd for VERIFIED rows and visually lied with "Sent!") to
+      // the new participant-host endpoint that actually re-dispatches the
+      // entry-code confirmation email. Body shape is identical so this is
+      // purely a URL change.
+      const res = await fetch("/api/resend-confirmation-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ activationId, email, consentVersion }),

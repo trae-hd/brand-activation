@@ -135,6 +135,7 @@ describe("/api/resend-confirmation-email", () => {
     expect(sendArgs.entryCode).toBe(VERIFIED_REG.entryCode);
     expect(sendArgs.activationName).toBe("Wembley Live Test");
     expect(sendArgs.supportEmail).toBe("hello@mrqlive.com");
+    expect(sendArgs.cause).toBe("resend");
 
     // Timestamp updated.
     expect(mockRegistrationUpdate).toHaveBeenCalledWith({

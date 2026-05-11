@@ -54,6 +54,10 @@ export interface EmailProvider {
     activationName: string;
     activationEndsAt: Date;
     supportEmail: string;
+    /** `'verify'` for the post-OTP-verification send; `'resend'` for the
+     * on-demand send from `/api/resend-confirmation-email`. Threads through
+     * to the email template's headline + the audit row's `metadata.cause`. */
+    cause: "verify" | "resend";
   }): Promise<EmailSendSuccess | EmailSendFailure>;
 }
 

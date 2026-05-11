@@ -152,7 +152,7 @@ export const resendProvider: EmailProvider = {
     );
   },
 
-  sendEntryCodeConfirmation: async ({ to, entryCode, activationName, activationEndsAt, supportEmail }) => {
+  sendEntryCodeConfirmation: async ({ to, entryCode, activationName, activationEndsAt, supportEmail, cause }) => {
     const html = await render(
       React.createElement(EntryCodeConfirmationEmail, {
         to,
@@ -160,6 +160,7 @@ export const resendProvider: EmailProvider = {
         activationName,
         activationEndsAt,
         supportEmail,
+        cause,
       }),
     );
     const text = entryCodeConfirmationText({
@@ -168,6 +169,7 @@ export const resendProvider: EmailProvider = {
       activationName,
       activationEndsAt,
       supportEmail,
+      cause,
     });
     const subject = entryCodeConfirmationSubject(activationName);
     return toProviderResult(await sendWithRetry({ to, subject, html, text }));

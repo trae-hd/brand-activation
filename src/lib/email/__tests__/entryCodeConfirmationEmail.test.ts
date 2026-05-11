@@ -17,6 +17,7 @@ const PROPS = {
   // local in London (BST = UTC+1).
   activationEndsAt: new Date("2026-07-31T17:00:00Z"),
   supportEmail: "hello@mrqlive.com",
+  cause: "verify" as const,
 };
 
 describe("EntryCodeConfirmationEmail", () => {
@@ -53,5 +54,41 @@ describe("EntryCodeConfirmationEmail", () => {
     const text = plainTextFor(PROPS);
     expect(text).toContain("Contact us at hello@mrqlive.com");
     expect(text.toLowerCase()).toContain("not monitored");
+  });
+
+  it("cause: 'verify' renders the initial-confirmation headline (HTML + plaintext)", async () => {
+    const props = { ...PROPS, cause: "verify" as const };
+    const html = await render(React.createElement(EntryCodeConfirmationEmail, props));
+    const text = plainTextFor(props);
+
+    // React injects <!-- --> between text and JSX interpolations, so we
+    // can't substring-match across them. The unique discriminators are:
+    //   verify  → "registered for"
+    //   resend  → "again, as requested"
+    expect(html).toContain("registered for");
+    expect(html).toContain("Here&#x27;s your entry code:");
+    expect(html).not.toContain("again, as requested");
+
+    expect(text).toContain("You're registered for Wembley Live Test");
+    expect(text).toContain("Here's your entry code:");
+    expect(text).not.toContain("again, as requested");
+  });
+
+  it("cause: 'resend' renders the 'again, as requested' headline (HTML + plaintext)", async () => {
+    const props = { ...PROPS, cause: "resend" as const };
+    const html = await render(EntryCodeConfirmationEmail(props));
+    const text = plainTextFor(props);
+
+    expect(html).toContain("again, as requested");
+    // Verify-variant lede + subheading must NOT appear in the resend
+    // variant — re-using "you're registered" would confuse a participant
+    // who clicked Resend.
+    expect(html).not.toContain("registered for");
+    expect(html).not.toContain("Here&#x27;s your entry code:");
+
+    expect(text).toContain("Here's your entry code again, as requested.");
+    expect(text).not.toContain("You're registered for");
+    // Entry code itself is still emitted on its own line in both variants.
+    expect(text.split("\n")).toContain(PROPS.entryCode);
   });
 });

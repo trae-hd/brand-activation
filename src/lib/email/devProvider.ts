@@ -24,9 +24,9 @@ export const devProvider: EmailProvider = {
     console.log(`[devProvider] password reset email to ${to} (no-op)`);
     return { ok: true, messageId: DEV_MESSAGE_ID };
   },
-  async sendEntryCodeConfirmation({ to, entryCode, activationName }) {
+  async sendEntryCodeConfirmation({ to, entryCode, activationName, cause }) {
     console.log(
-      `[devProvider] entry code confirmation to ${to} — ${entryCode} for ${activationName} (no-op)`,
+      `[devProvider] entry code confirmation (cause=${cause}) to ${to} — ${entryCode} for ${activationName} (no-op)`,
     );
     return { ok: true, messageId: DEV_MESSAGE_ID };
   },

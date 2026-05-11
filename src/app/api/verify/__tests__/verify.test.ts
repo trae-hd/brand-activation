@@ -263,6 +263,7 @@ describe("/api/verify — post-verify audit + email", () => {
     expect(sendArgs.supportEmail).toBe("hello@mrqlive.com");
     expect(sendArgs.activationEndsAt).toEqual(new Date("2026-07-31T17:00:00Z"));
     expect(typeof sendArgs.entryCode).toBe("string");
+    expect(sendArgs.cause).toBe("verify");
 
     // confirmationEmailSentAt update happened (second update call)
     const sentAtUpdates = mockRegistrationUpdate.mock.calls.filter(
