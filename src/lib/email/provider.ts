@@ -16,6 +16,13 @@ export interface EmailProvider {
     to: string;
     setPasswordUrl: string;
   }): Promise<{ ok: true } | { ok: false; reason: string }>;
+  sendEntryCodeConfirmation(args: {
+    to: string;
+    entryCode: string;
+    activationName: string;
+    activationEndsAt: Date;
+    supportEmail: string;
+  }): Promise<{ ok: true; messageId: string } | { ok: false; reason: string }>;
 }
 
 /**

@@ -201,6 +201,15 @@ model Registration {
   /// Generated at OTP verification if the activation has an entryCodePrefix.
   entryCode String?
 
+  /// Set when the post-verify confirmation email has been successfully
+  /// dispatched via Resend. Null for:
+  ///   - PENDING / EXPIRED rows (never verified)
+  ///   - VERIFIED rows that predate this feature (no backfill)
+  ///   - VERIFIED rows where the dispatch failed
+  /// "Sent" here means Resend accepted the request, NOT that the email
+  /// was delivered to the inbox. Delivery tracking is via Resend's dashboard.
+  confirmationEmailSentAt DateTime?
+
   registeredAt DateTime  @default(now())
   verifiedAt   DateTime?
 

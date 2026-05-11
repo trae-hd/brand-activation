@@ -23,6 +23,10 @@ const schema = z.object({
   // Email
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().email(),
+  /// Contact address shown in the body of the post-verify confirmation email
+  /// ("Need help? Contact us at …"). One-way send — no Reply-To header is
+  /// set. Falls back to EMAIL_FROM at the call site when absent.
+  SUPPORT_EMAIL: z.string().email().optional(),
 
   // Auth domain allowlist
   ALLOWED_EMAIL_DOMAIN: z.string().min(1),
