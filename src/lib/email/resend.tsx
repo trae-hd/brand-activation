@@ -137,7 +137,23 @@ export const resendProvider: EmailProvider = {
 
   sendInvite: async ({ to, name, setPasswordUrl, issuerName, workspaceName, role }) => {
     const roleLabel = role === "ADMIN" ? "Administrator" : "Member";
-    const html = await render(React.createElement(InviteEmail, { name, setPasswordUrl, issuerName, workspaceName, role }));
+    // `sentAt` / `expiresAt` are computed here (provider, not a React
+    // component) so the template stays pure for `react-hooks/purity`. The
+    // 1-hour TTL mirrors the AdminInvite row's `expiresAt` set at the call
+    // site — kept in sync by convention, not by passing it through.
+    const sentAt = new Date();
+    const expiresAt = new Date(sentAt.getTime() + 60 * 60 * 1000);
+    const html = await render(
+      React.createElement(InviteEmail, {
+        name,
+        setPasswordUrl,
+        issuerName,
+        workspaceName,
+        role,
+        sentAt,
+        expiresAt,
+      }),
+    );
     const text = `Hi ${name},\n\n${issuerName} invited you to join ${workspaceName} on MrQ Live as ${roleLabel}.\n\nSet your password here:\n${setPasswordUrl}\n\nThis link expires in 1 hour. If you weren't expecting this invitation, you can ignore this email — no account is created until you accept.`;
     return toProviderResult(
       await sendWithRetry({ to, subject: `${issuerName} invited you to ${workspaceName}`, html, text }),
@@ -145,7 +161,13 @@ export const resendProvider: EmailProvider = {
   },
 
   sendPasswordReset: async ({ to, setPasswordUrl }) => {
-    const html = await render(React.createElement(PasswordResetEmail, { setPasswordUrl, to }));
+    // Same purity rationale as sendInvite: dates lifted out of the template
+    // body. 1-hour TTL mirrors PasswordResetToken.expiresAt at the call site.
+    const sentAt = new Date();
+    const expiresAt = new Date(sentAt.getTime() + 60 * 60 * 1000);
+    const html = await render(
+      React.createElement(PasswordResetEmail, { setPasswordUrl, to, sentAt, expiresAt }),
+    );
     const text = `We received a request to reset the password for your MrQ Live account.\n\nChoose a new password here:\n${setPasswordUrl}\n\nThis link expires in 60 minutes. If you didn't request this, you can ignore this email — your password won't change.`;
     return toProviderResult(
       await sendWithRetry({ to, subject: "Reset your MrQ Live password", html, text }),

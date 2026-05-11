@@ -19,18 +19,33 @@ const MONO = '"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace';
 export interface PasswordResetEmailProps {
   setPasswordUrl: string;
   to: string;
+  /** When the reset was issued. Lifted from `Date.now()` in the template
+   * body to satisfy `react-hooks/purity` — React components must be pure
+   * functions of their props. Caller
+   * (`resendProvider.sendPasswordReset`) provides a stable timestamp
+   * captured outside the render path. */
+  sentAt: Date;
+  /** When the reset link expires. Same purity rationale as `sentAt`. */
+  expiresAt: Date;
 }
+
+// Fixed timestamps for React Email's preview tool. Evaluated once at module
+// load and shared across every preview render.
+const PREVIEW_SENT_AT = new Date("2026-01-01T12:00:00.000Z");
+const PREVIEW_EXPIRES_AT = new Date("2026-01-01T13:00:00.000Z");
 
 export function PasswordResetEmail({
   setPasswordUrl = "#",
   to = "you@example.com",
+  sentAt = PREVIEW_SENT_AT,
+  expiresAt = PREVIEW_EXPIRES_AT,
 }: PasswordResetEmailProps) {
   const expiryTime = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "UTC",
     hour12: false,
-  }).format(new Date(Date.now() + 60 * 60 * 1000));
+  }).format(expiresAt);
 
   const sentDate = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -40,7 +55,7 @@ export function PasswordResetEmail({
     minute: "2-digit",
     timeZone: "UTC",
     hour12: false,
-  }).format(new Date());
+  }).format(sentAt);
 
   return (
     <Html lang="en">

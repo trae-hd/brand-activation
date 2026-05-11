@@ -22,6 +22,13 @@ export interface InviteEmailProps {
   issuerName: string;
   workspaceName: string;
   role: "ADMIN" | "MEMBER";
+  /** When the invite was issued. Lifted from `Date.now()` in the template
+   * body to satisfy `react-hooks/purity` — React components must be pure
+   * functions of their props. Caller (`resendProvider.sendInvite`)
+   * provides a stable timestamp captured outside the render path. */
+  sentAt: Date;
+  /** When the invite link expires. Same purity rationale as `sentAt`. */
+  expiresAt: Date;
 }
 
 function initials(name: string): string {
@@ -37,12 +44,18 @@ function roleLabel(role: "ADMIN" | "MEMBER"): string {
   return role === "ADMIN" ? "Administrator" : "Member";
 }
 
+// Fixed timestamps for React Email's preview tool. Evaluated once at module
+// load and shared across every preview render — keeps the previewed email
+// visually stable across reloads and avoids any `new Date()` call inside the
+// component body.
 const PREVIEW_DEFAULTS: InviteEmailProps = {
   name: "Jordan",
   setPasswordUrl: "#",
   issuerName: "Priya Shah",
   workspaceName: "MrQ Live",
   role: "ADMIN",
+  sentAt: new Date("2026-01-01T12:00:00.000Z"),
+  expiresAt: new Date("2026-01-01T13:00:00.000Z"),
 };
 
 export function InviteEmail({
@@ -51,18 +64,20 @@ export function InviteEmail({
   issuerName = PREVIEW_DEFAULTS.issuerName,
   workspaceName = PREVIEW_DEFAULTS.workspaceName,
   role = PREVIEW_DEFAULTS.role,
+  sentAt = PREVIEW_DEFAULTS.sentAt,
+  expiresAt = PREVIEW_DEFAULTS.expiresAt,
 }: InviteEmailProps) {
-  const sentDate = new Date().toLocaleDateString("en-GB", {
+  const sentDate = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  });
+  }).format(sentAt);
   const expiryTime = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "UTC",
     hour12: false,
-  }).format(new Date(Date.now() + 60 * 60 * 1000));
+  }).format(expiresAt);
 
   return (
     <Html lang="en">
