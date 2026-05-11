@@ -48,7 +48,11 @@ export function proxy(req: NextRequest) {
   }
 
   // Participant Route Handlers are reachable only on the participant host.
-  if (path === "/api/register" || path === "/api/verify") {
+  if (
+    path === "/api/register" ||
+    path === "/api/verify" ||
+    path === "/api/resend-confirmation-email"
+  ) {
     return host === participantHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
