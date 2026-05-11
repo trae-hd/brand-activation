@@ -162,9 +162,6 @@ export async function POST(req: Request) {
             ipHash,
           });
         } else {
-          // The Phase 1 provider can't yet distinguish 4xx (rejected) vs 5xx
-          // (transient) — both surface as { ok: false, reason: "send-failed" }.
-          // Default to "transient" until the provider classifies its errors.
           await writeAuditLog({
             category: "ADMIN",
             action: "participant.confirmation_email_failed",
@@ -172,8 +169,9 @@ export async function POST(req: Request) {
             targetId: decoded.registrationId,
             metadata: {
               emailHash,
-              reason: "transient",
-              attempts: 2,
+              reason: result.reason,
+              attempts: result.attempts,
+              lastError: result.lastError,
               cause: "verify",
             },
             ipHash,

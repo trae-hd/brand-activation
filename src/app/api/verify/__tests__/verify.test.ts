@@ -284,9 +284,14 @@ describe("/api/verify — post-verify audit + email", () => {
     expect(sentRow.targetType).toBe("Registration");
   });
 
-  it("email failure path: writes _failed audit row but response stays 200", async () => {
+  it("email failure (transient 5xx, two attempts): writes _failed audit row with reason='transient', attempts=2; response stays 200", async () => {
     setupHappyPathVerifyMocks();
-    mockSendEntryCodeConfirmation.mockResolvedValue({ ok: false, reason: "send-failed" });
+    mockSendEntryCodeConfirmation.mockResolvedValue({
+      ok: false,
+      reason: "transient",
+      attempts: 2,
+      lastError: "internal_server_error: boom",
+    });
 
     const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
 
@@ -305,10 +310,37 @@ describe("/api/verify — post-verify audit + email", () => {
 
     const failedRow = mockWriteAuditLog.mock.calls.find(
       (c) => (c[0] as { action: string }).action === "participant.confirmation_email_failed",
-    )?.[0] as { metadata: { reason: string; cause: string; attempts: number } };
+    )?.[0] as {
+      metadata: { reason: string; cause: string; attempts: number; lastError: string };
+    };
     expect(failedRow.metadata.reason).toBe("transient");
     expect(failedRow.metadata.cause).toBe("verify");
     expect(failedRow.metadata.attempts).toBe(2);
+    expect(failedRow.metadata.lastError).toBe("internal_server_error: boom");
+  });
+
+  it("email failure (4xx rejected, single attempt): writes _failed audit row with reason='rejected', attempts=1", async () => {
+    setupHappyPathVerifyMocks();
+    mockSendEntryCodeConfirmation.mockResolvedValue({
+      ok: false,
+      reason: "rejected",
+      attempts: 1,
+      lastError: "validation_error: from must be a verified domain",
+    });
+
+    const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
+
+    expect(res.status).toBe(200);
+
+    const failedRow = mockWriteAuditLog.mock.calls.find(
+      (c) => (c[0] as { action: string }).action === "participant.confirmation_email_failed",
+    )?.[0] as {
+      metadata: { reason: string; cause: string; attempts: number; lastError: string };
+    };
+    expect(failedRow.metadata.reason).toBe("rejected");
+    expect(failedRow.metadata.attempts).toBe(1);
+    expect(failedRow.metadata.cause).toBe("verify");
+    expect(failedRow.metadata.lastError).toContain("validation_error");
   });
 
   it("idempotent re-verify: confirmationEmailSentAt non-null suppresses a second send and a second _sent audit row", async () => {

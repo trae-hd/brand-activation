@@ -1,10 +1,14 @@
 /**
- * Provider-level tests for the new sendEntryCodeConfirmation method.
+ * Provider-level tests for sendEntryCodeConfirmation.
  *
- * The codebase uses a result-shape return ({ ok, reason } / { ok, messageId })
- * rather than throw-on-failure — the prompt §10 says "throws after both
- * attempts fail" but the codebase convention is checked, not thrown.
- * Audit branching at the call site reads `result.ok`.
+ * Phase 1 established the call/retry/double-fail surface; Phase 3 adds error
+ * classification (rejected vs transient) so the audit row's metadata.reason
+ * carries actionable info. Failure shape is now
+ * { ok: false; reason: 'rejected' | 'transient'; attempts: 1 | 2; lastError }.
+ *
+ * Mocked Resend errors must include a `name` from RESEND_ERROR_CODES_BY_KEY —
+ * the provider's classifier dispatches on the name. An unnamed error in a
+ * test would silently behave as `rejected` and skip the retry.
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -63,9 +67,12 @@ describe("resendProvider.sendEntryCodeConfirmation", () => {
     expect(result).toEqual({ ok: true, messageId: "msg_abc123" });
   });
 
-  it("retries once on transient failure and succeeds on the second attempt", async () => {
+  it("retries once on a transient 5xx and succeeds on the second attempt (attempts: 2)", async () => {
     sendMock
-      .mockResolvedValueOnce({ data: null, error: { message: "transient 5xx" } })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "internal_server_error", message: "boom" },
+      })
       .mockResolvedValueOnce({ data: { id: "msg_retry_ok" }, error: null });
 
     const provider = await loadProvider();
@@ -75,19 +82,64 @@ describe("resendProvider.sendEntryCodeConfirmation", () => {
     expect(result).toEqual({ ok: true, messageId: "msg_retry_ok" });
   });
 
-  it("returns { ok: false } after both attempts fail", async () => {
+  it("returns { ok: false, reason: 'transient', attempts: 2 } after two 5xx attempts", async () => {
     sendMock
-      .mockResolvedValueOnce({ data: null, error: { message: "first failure" } })
-      .mockResolvedValueOnce({ data: null, error: { message: "second failure" } });
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "internal_server_error", message: "first failure" },
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "application_error", message: "second failure" },
+      });
 
     const provider = await loadProvider();
     const result = await provider.sendEntryCodeConfirmation(ARGS);
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ ok: false, reason: "send-failed" });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("transient");
+    expect(result.attempts).toBe(2);
+    expect(result.lastError).toContain("application_error");
+    expect(result.lastError).toContain("second failure");
+    expect(result.lastError.length).toBeLessThanOrEqual(200);
   });
 
-  it("returns { ok: false } when both attempts throw (network error)", async () => {
+  it("does not retry on a 4xx (validation_error) — returns reason: 'rejected', attempts: 1", async () => {
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "validation_error", message: "from must be a verified domain" },
+    });
+
+    const provider = await loadProvider();
+    const result = await provider.sendEntryCodeConfirmation(ARGS);
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("rejected");
+    expect(result.attempts).toBe(1);
+    expect(result.lastError).toContain("validation_error");
+  });
+
+  it("does not retry on a 4xx (missing_required_field) — returns reason: 'rejected', attempts: 1", async () => {
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "missing_required_field", message: "to is required" },
+    });
+
+    const provider = await loadProvider();
+    const result = await provider.sendEntryCodeConfirmation(ARGS);
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("rejected");
+    expect(result.attempts).toBe(1);
+  });
+
+  it("classifies thrown network errors (ECONNRESET) as transient and retries once", async () => {
     sendMock.mockRejectedValueOnce(new Error("ECONNRESET"));
     sendMock.mockRejectedValueOnce(new Error("ECONNRESET"));
 
@@ -95,6 +147,172 @@ describe("resendProvider.sendEntryCodeConfirmation", () => {
     const result = await provider.sendEntryCodeConfirmation(ARGS);
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ ok: false, reason: "send-failed" });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("transient");
+    expect(result.attempts).toBe(2);
+    expect(result.lastError).toContain("ECONNRESET");
+  });
+
+  it("truncates lastError to ≤200 chars and never echoes the recipient address", async () => {
+    const longBlast = "X".repeat(500);
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "validation_error", message: longBlast },
+    });
+
+    const provider = await loadProvider();
+    const result = await provider.sendEntryCodeConfirmation(ARGS);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.lastError.length).toBeLessThanOrEqual(200);
+    // Provider must not include the recipient email — that would put PII in
+    // the audit log.
+    expect(result.lastError).not.toContain(ARGS.to);
+  });
+
+  it("succeeds on retry after a 5xx — surfaces the second-attempt messageId", async () => {
+    sendMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "application_error", message: "transient" },
+      })
+      .mockResolvedValueOnce({ data: { id: "msg_after_retry" }, error: null });
+
+    const provider = await loadProvider();
+    const result = await provider.sendEntryCodeConfirmation(ARGS);
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ ok: true, messageId: "msg_after_retry" });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Failure-shape parity: every EmailProvider method runs through the same
+// sendWithRetry helper, so classification (rejected vs transient, attempts,
+// lastError) must surface uniformly. These tests exercise sendOtp,
+// sendInvite, and sendPasswordReset to prove the shape isn't only carried
+// by sendEntryCodeConfirmation.
+// ──────────────────────────────────────────────────────────────────────
+
+describe("resendProvider — structured failure shape across all methods", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it("sendOtp surfaces { reason: 'rejected', attempts: 1 } on a 4xx", async () => {
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "validation_error", message: "from must be a verified domain" },
+    });
+
+    const provider = await loadProvider();
+    const result = await provider.sendOtp({ to: "punter@example.com", otp: "123456" });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("rejected");
+    expect(result.attempts).toBe(1);
+    expect(result.lastError).toContain("validation_error");
+  });
+
+  it("sendInvite surfaces { reason: 'transient', attempts: 2 } on two 5xx attempts", async () => {
+    sendMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "internal_server_error", message: "boom" },
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { name: "application_error", message: "still boom" },
+      });
+
+    const provider = await loadProvider();
+    const result = await provider.sendInvite({
+      to: "newadmin@mrq.com",
+      name: "Casey Admin",
+      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=invite&token=abc",
+      issuerName: "Trae",
+      workspaceName: "MrQ Live",
+      role: "ADMIN",
+    });
+
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.reason).toBe("transient");
+    expect(result.attempts).toBe(2);
+    expect(result.lastError).toContain("application_error");
+  });
+
+  it("sendPasswordReset surfaces { reason: 'rejected', attempts: 1 } on a 429 (rate_limit_exceeded)", async () => {
+    sendMock.mockResolvedValueOnce({
+      data: null,
+      error: { name: "rate_limit_exceeded", message: "Too many requests" },
+    });
+
+    const provider = await loadProvider();
+    const result = await provider.sendPasswordReset({
+      to: "trae@mrq.com",
+      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=reset&token=xyz",
+    });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    // 429s are 4xx-class for our purposes — retrying immediately would just
+    // re-hit the limit. Default branch correctly classifies as 'rejected'.
+    expect(result.reason).toBe("rejected");
+    expect(result.attempts).toBe(1);
+    expect(result.lastError).toContain("rate_limit_exceeded");
+  });
+
+  it("sendOtp success surface carries messageId: { ok: true, messageId }", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_otp_ok" }, error: null });
+
+    const provider = await loadProvider();
+    const result = await provider.sendOtp({ to: "punter@example.com", otp: "654321" });
+
+    expect(result).toEqual({ ok: true, messageId: "msg_otp_ok" });
+  });
+
+  it("sendInvite success surface carries messageId: { ok: true, messageId }", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_invite_ok" }, error: null });
+
+    const provider = await loadProvider();
+    const result = await provider.sendInvite({
+      to: "newadmin@mrq.com",
+      name: "Casey Admin",
+      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=invite&token=abc",
+      issuerName: "Trae",
+      workspaceName: "MrQ Live",
+      role: "MEMBER",
+    });
+
+    expect(result).toEqual({ ok: true, messageId: "msg_invite_ok" });
+  });
+
+  it("sendPasswordReset success surface carries messageId: { ok: true, messageId }", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_reset_ok" }, error: null });
+
+    const provider = await loadProvider();
+    const result = await provider.sendPasswordReset({
+      to: "trae@mrq.com",
+      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=reset&token=xyz",
+    });
+
+    expect(result).toEqual({ ok: true, messageId: "msg_reset_ok" });
+  });
+
+  it("sendEntryCodeConfirmation success surface carries messageId (parity check with the other three)", async () => {
+    sendMock.mockResolvedValueOnce({ data: { id: "msg_entry_ok" }, error: null });
+
+    const provider = await loadProvider();
+    const result = await provider.sendEntryCodeConfirmation(ARGS);
+
+    expect(result).toEqual({ ok: true, messageId: "msg_entry_ok" });
   });
 });
