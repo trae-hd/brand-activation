@@ -3,9 +3,9 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 
-type FilterChip = "All" | "Activation" | "User" | "Legal" | "Erasure" | "Reveal";
+type FilterChip = "All" | "Activation" | "User" | "Legal" | "Erasure" | "Reveal" | "Email";
 
-const CHIPS: FilterChip[] = ["All", "Activation", "User", "Legal", "Erasure", "Reveal"];
+const CHIPS: FilterChip[] = ["All", "Activation", "User", "Legal", "Erasure", "Reveal", "Email"];
 
 export interface AuditRowDisplay {
   id: string;
@@ -29,6 +29,16 @@ function matchesChip(action: string, chip: FilterChip): boolean {
   if (chip === "Legal") return action.includes("legal");
   if (chip === "Erasure") return action.includes("erasure");
   if (chip === "Reveal") return action === "EMAIL_REVEAL";
+  if (chip === "Email") {
+    // Catches the three actions added by the post-verify confirmation email
+    // feature and any future participant.*_email_* / participant.resend_*
+    // actions filed under the same shape.
+    return (
+      action === "participant.confirmation_email_sent" ||
+      action === "participant.confirmation_email_failed" ||
+      action === "participant.resend_rate_limited"
+    );
+  }
   return false;
 }
 
@@ -71,6 +81,24 @@ function diffFromEntry(action: string, m: Record<string, unknown> | null): strin
   if (action === "erasure.fulfilled") {
     const count = meta.rowCount as number | undefined;
     return count !== undefined ? `${count} row${count !== 1 ? "s" : ""} erased` : "erased";
+  }
+  if (action === "participant.confirmation_email_sent") {
+    const cause = meta.cause as string | undefined;
+    return cause ? `cause: ${cause}` : "sent";
+  }
+  if (action === "participant.confirmation_email_failed") {
+    const reason = meta.reason as string | undefined;
+    const cause = meta.cause as string | undefined;
+    const attempts = meta.attempts as number | undefined;
+    const parts: string[] = [];
+    if (reason) parts.push(reason);
+    if (cause) parts.push(`cause: ${cause}`);
+    if (attempts !== undefined) parts.push(`${attempts} attempt${attempts !== 1 ? "s" : ""}`);
+    return parts.join(" · ") || "failed";
+  }
+  if (action === "participant.resend_rate_limited") {
+    const scope = meta.scope as string | undefined;
+    return scope ? `scope: ${scope}` : "rate-limited";
   }
 
   // Fallback: first two metadata keys

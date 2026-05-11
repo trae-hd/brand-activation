@@ -126,11 +126,40 @@ See `src/resource/MRQ_LIVE_ACTIVATION_LITE_MASTER_PROMPT_V5.md` §15 for the ful
 
 After each production deploy, run the following against `https://mrqlive.co.uk`:
 
-1. Create a test activation in the admin console with status `LIVE`.
+1. Create a test activation in the admin console with status `LIVE`. The activation must have an `entryCodePrefix` set so an entry code is generated at verification time (steps 4 and 5 require it).
 2. Register with a test email address via the participant landing page.
 3. Retrieve the OTP from the Resend dashboard (or the test inbox) and verify.
-4. Confirm the `LiveCounter` on the dashboard increments to 1 verified.
-5. Download the registrations CSV and confirm the test row is present.
-6. Navigate to **Admin → Erasure** and erase the test email. Confirm the audit log entry.
+4. **Confirm the post-verify confirmation email arrives in the test inbox.** The subject reads `Your entry code for <activation name>`. The body contains the entry code on its own line. Audit log: one `participant.verified` row + one `participant.confirmation_email_sent` row with `metadata.cause = "verify"` and a Resend `messageId`.
+5. **Click "Resend" on the success page.** A second email arrives with the headline *"Here's your entry code again, as requested."* (the resend variant — single-line heading, no subheading). Audit log: a second `participant.confirmation_email_sent` row with `metadata.cause = "resend"`.
+6. **Click Resend three more times.** The 4th attempt is rate-limited (per-`(activationId, emailHash)` cap is 3/hour). The button still optimistically reads "Sent!" but no email goes out. Audit log: a `participant.resend_rate_limited` row with `metadata.scope = "activation_email"`.
+7. Confirm the `LiveCounter` on the dashboard increments to 1 verified.
+8. Download the registrations CSV and confirm the test row is present.
+9. Navigate to **Admin → Erasure** and erase the test email. Confirm the audit log entry.
 
-This rehearses the full GDPR loop and confirms email delivery is working on production.
+This rehearses the full GDPR loop, the post-verify email send + resend flow, and the rate-limit / anti-enumeration audit trail. It confirms email delivery is working on production for both the OTP and the entry-code confirmation.
+
+---
+
+## Audit Actions Added by the Post-Verify Email Feature
+
+Three new audit actions support the post-verify confirmation-email flow. Useful when investigating support tickets ("I never got my entry code", "I got two", "the resend button isn't working"):
+
+| Action | Category | When written | `metadata` shape |
+|---|---|---|---|
+| `participant.confirmation_email_sent` | `ADMIN` | Resend accepted a send (verify-time OR on-demand resend) | `{ emailHash, resendMessageId, cause: "verify" \| "resend" }` |
+| `participant.confirmation_email_failed` | `ADMIN` | Send failed after the in-line retry policy ran | `{ emailHash, reason: "rejected" \| "transient", attempts: 1 \| 2, cause: "verify" \| "resend", lastError? }` |
+| `participant.resend_rate_limited` | `SECURITY` | The resend endpoint denied a request via either rate limit | `{ emailHash, scope: "ip" \| "activation_email" }` |
+
+All three rows have `actorId: NULL` (system-initiated) and an `ipHash` from the request. The `_sent`/`_failed` rows target `Registration`; the `_rate_limited` row targets `Activation` (the registration may not exist on the rate-limit path).
+
+### Investigating "I never got my email" tickets
+
+1. Get the participant's `emailHash`: `SELECT "emailHash" FROM "Registration" WHERE email = '<plaintext>'` from the admin Postgres console (or use **Admin → Audit** with the email-hash printed in the participant's user-management view).
+2. Search the audit log: `SELECT action, metadata, "createdAt" FROM "AuditLog" WHERE "metadata"->>'emailHash' = '<hash>' ORDER BY "createdAt" DESC LIMIT 20;`
+3. Look for the most recent `participant.confirmation_email_sent` (success) or `_failed` row. If `_failed`, `metadata.reason` tells you whether it was rejected (4xx — bad domain, suppressed) or transient (5xx — Resend outage); `metadata.lastError` carries the truncated provider error.
+4. Cross-reference the `metadata.resendMessageId` against the Resend dashboard for delivery status.
+
+### Investigating rate-limit complaints
+
+1. Same hash lookup as above.
+2. `… WHERE action = 'participant.resend_rate_limited' AND "metadata"->>'emailHash' = '<hash>'` shows every denial with `metadata.scope` indicating which limiter fired (`ip` for blanket scraping; `activation_email` for the per-`(activationId, emailHash)` cap).

@@ -45,12 +45,13 @@ This is the canonical backlog of **deferred work, known limitations, and discuss
 - **Priority / effort:** P3 / L
 - **Blocked on:** SMS provider selection + per-region cost analysis. Schema would need `Registration.phone` (encrypted, hashed for lookup) and a parallel `issueOtpSms()` flow.
 
-### 1.3 · Recover entry code without re-verifying
-- **Status:** Discussed (2026-05-09) in resend dead-end thread.
-- **Priority / effort:** P2 / M
-- **Problem:** A participant who verified successfully but lost their confirmation email has no in-app way to recover their entry code. The `/api/register` no-op path correctly refuses to re-issue an OTP for a verified email; the `mailto:hello@mrqlive.com` link on `/expired` and `/verify` is the current escalation path, requiring human intervention.
-- **Sketch:** New endpoint `POST /api/recover-entry-code` taking `{ activationId, email }`; if a `VERIFIED` row exists, send a "your entry code is X" email. Rate-limited identically to `/api/register`. Audit-logged. Anti-enumeration shape: same opaque 202 response whether the email matches a row or not.
-- **Files:** `src/app/api/recover-entry-code/route.ts` (new), `src/lib/email/templates/EntryCodeRecoveryEmail.tsx` (new), participant UI link from `/verify` and `/expired`.
+### 1.3 · Recover entry code without re-verifying — **CLOSED (2026-05-11)**
+- **Status:** ✅ Closed by `MRQ_LIVE_POST_VERIFY_EMAIL_PROMPT_V1.md` Phase 6 rollout. Sending the entry code at verification time + the success-page Resend button (now actually working — Phase 5 rewired it from `/api/register` to `/api/resend-confirmation-email`) means the inbox is the recovery artefact and the on-demand resend covers the loss case. A separate `/api/recover-entry-code` endpoint was deemed unnecessary; the existing flow does the job with anti-enumeration parity.
+- **Priority / effort:** ~~P2 / M~~ — closed.
+- **Original problem:** A participant who verified successfully but lost their confirmation email had no in-app way to recover their entry code. The `/api/register` no-op path correctly refused to re-issue an OTP for a verified email; the `mailto:hello@mrqlive.com` link on `/expired` and `/verify` was the only escalation path, requiring human intervention.
+- **What shipped instead:** Synchronous post-verify email send in `/api/verify` (Phase 2) + new `/api/resend-confirmation-email` endpoint with two-tier rate limit and 150ms timing-floor anti-enumeration (Phase 4) + success-page button rewire (Phase 5). The participant now receives the entry code by email at verify time and can self-serve a resend via the success page.
+- **Original sketch (for reference, not implemented):** New endpoint `POST /api/recover-entry-code` taking `{ activationId, email }`; if a `VERIFIED` row exists, send a "your entry code is X" email. Rate-limited identically to `/api/register`. Audit-logged. Anti-enumeration shape: same opaque 202 response whether the email matches a row or not.
+- **Files (not created — sketch only):** ~~`src/app/api/recover-entry-code/route.ts`~~ ~~`src/lib/email/templates/EntryCodeRecoveryEmail.tsx`~~ ~~participant UI link from `/verify` and `/expired`.~~
 
 ### 1.4 · Plug timing leak on `/api/register` noop path
 - **Status:** Discussed (2026-05-10) and explicitly deferred per team review. See [thread context in commit `87ab708`].
