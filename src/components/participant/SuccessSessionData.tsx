@@ -9,7 +9,6 @@ interface Props {
   showEntryCode: boolean;
   showResend: boolean;
   showCta: boolean;
-  primaryColor: string | null;
   isPreview?: boolean;
 }
 
@@ -20,7 +19,6 @@ export function SuccessSessionData({
   showEntryCode,
   showResend,
   showCta,
-  primaryColor,
   isPreview = false,
 }: Props) {
   const [session] = useState<{
@@ -50,21 +48,9 @@ export function SuccessSessionData({
     ? session.email.replace(/^(.)(.*)(@.*)$/, (_, a, _b, domain) => `${a}…${domain}`)
     : null;
 
-  const btnStyle: React.CSSProperties =
-    primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
-      ? { backgroundColor: primaryColor, color: "#fff" }
-      : {};
-  const btnClass = primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
-    ? ""
-    : "bg-primary text-primary-foreground";
-
-  // Entry-code card uses the activation's brand colour as the background and
-  // white text. When no brand colour is configured, fall back to the platform
-  // default (#0a2ecb) so the card always has the same shape — kept consistent
-  // with the new "default new activations to MrQ blue" behaviour.
-  const entryCodeBg = primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
-    ? primaryColor
-    : "#0a2ecb";
+  // --primary and --primary-foreground are injected by the server-rendered
+  // <main> in success/page.tsx, so bg-primary / text-primary-foreground
+  // automatically reflect the activation's brand colour in any theme.
 
   async function handleResend() {
     const { activationId, email, consentVersion } = session;
@@ -97,10 +83,7 @@ export function SuccessSessionData({
       )}
 
       {showEntryCode && session.entryCode && (
-        <div
-          className="mt-5 w-full rounded-md p-4 text-white"
-          style={{ background: entryCodeBg, color: "#ffffff" }}
-        >
+        <div className="mt-5 w-full rounded-md bg-primary p-4 text-primary-foreground">
           <p className="text-xs font-semibold uppercase tracking-widest">
             Your entry code
           </p>
@@ -119,16 +102,14 @@ export function SuccessSessionData({
             href={successCtaUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`mt-4 block w-full rounded-md px-4 py-3 text-center text-sm font-semibold ${btnClass}`}
-            style={btnStyle}
+            className="mt-4 block w-full rounded-md bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
           >
             {successCtaLabel}
           </a>
         ) : (
           <button
             type="button"
-            className={`mt-4 w-full rounded-md px-4 py-3 text-sm font-semibold ${btnClass}`}
-            style={btnStyle}
+            className="mt-4 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
           >
             {successCtaLabel}
           </button>

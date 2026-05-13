@@ -30,6 +30,20 @@ export function ActivationFormConsent({ consentItems, onChange, mrqContactConsen
           asterisk and must be ticked to register; optional items can be left unchecked.
         </p>
       </div>
+      {/* Age consent — locked, always present on every activation */}
+      <div className="rounded-md border bg-muted/20 p-3 flex flex-col gap-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium">Age Consent</span>
+          <span className="text-muted-foreground text-xs">
+            Default consent for all activations. Required and cannot be removed or edited.
+          </span>
+        </div>
+        <div className="flex items-start gap-2 opacity-60">
+          <div className="border-foreground/30 mt-0.5 h-4 w-4 shrink-0 rounded-sm border" />
+          <span className="text-xs leading-snug">I confirm that I am 18+</span>
+        </div>
+      </div>
+
       {consentItems.length > 0 && (
         <div className="flex flex-col gap-2">
           {consentItems.map((item, i) => (

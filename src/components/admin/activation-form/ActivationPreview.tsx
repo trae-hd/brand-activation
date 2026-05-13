@@ -552,28 +552,27 @@ function ConsentPreview({
     </div>
   ) : null;
 
-  if (consentItems.length > 0) {
-    return (
-      <div className={cn("flex flex-col", gap)}>
-        {consentItems.slice(0, 3).map((item, i) => (
-          <div key={i} className="flex items-start gap-1.5">
-            <div className={cn("border-foreground/30 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
-            <p className={cn("text-muted-foreground line-clamp-1 leading-tight", textSize)}>
-              {item.text || "Consent item…"}
-              {item.required && <span className="text-destructive ml-0.5">*</span>}
-            </p>
-          </div>
-        ))}
-        {mrqRow}
-      </div>
-    );
-  }
+  const ageRow = (
+    <div className="flex items-start gap-1.5">
+      <div className={cn("border-foreground/30 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
+      <p className={cn("text-muted-foreground line-clamp-1 leading-tight", textSize)}>
+        I confirm that I am 18+<span className="text-destructive ml-0.5">*</span>
+      </p>
+    </div>
+  );
+
   return (
     <div className={cn("flex flex-col", gap)}>
-      <div className="flex items-start gap-1.5">
-        <div className={cn("border-muted-foreground/20 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
-        <p className={cn("text-muted-foreground/40 leading-tight", textSize)}>No consent items added</p>
-      </div>
+      {ageRow}
+      {consentItems.slice(0, 2).map((item, i) => (
+        <div key={i} className="flex items-start gap-1.5">
+          <div className={cn("border-foreground/30 mt-0.5 shrink-0 rounded-sm border", checkSize)} />
+          <p className={cn("text-muted-foreground line-clamp-1 leading-tight", textSize)}>
+            {item.text || "Consent item…"}
+            {item.required && <span className="text-destructive ml-0.5">*</span>}
+          </p>
+        </div>
+      ))}
       {mrqRow}
     </div>
   );

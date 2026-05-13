@@ -131,7 +131,8 @@ export function RegistrationsTable({
   entryCodePrefix,
 }: Props) {
   const consentLabels = parseActivationConsentItems(consentItems);
-  const consentColCount = consentLabels.length + (mrqContactConsentEnabled ? 1 : 0);
+  // +1 for the hardcoded Age Consent column that always appears first
+  const consentColCount = 1 + consentLabels.length + (mrqContactConsentEnabled ? 1 : 0);
   const hasEntryCodes = !!entryCodePrefix && entryCodePrefix.trim().length > 0;
   const codePrefixUpper = (entryCodePrefix ?? "").toUpperCase();
 
@@ -354,6 +355,9 @@ export function RegistrationsTable({
               <th className="px-4 py-3 text-left font-medium">Booth</th>
               <th className="px-4 py-3 text-left font-medium">UTM</th>
               <th className="px-4 py-3 text-left font-medium">IP hash</th>
+              <th className="px-4 py-3 text-left font-medium whitespace-nowrap text-xs">
+                Age Consent
+              </th>
               {consentLabels.map((label, i) => (
                 <th key={i} className="px-4 py-3 text-left font-medium max-w-[140px]">
                   <span title={label} className="block truncate text-xs font-medium">
@@ -444,7 +448,10 @@ export function RegistrationsTable({
                       const accepted = parseConsentItemsAccepted(r.consentItemsAccepted);
                       return (
                         <>
-                          {consentLabels.map((label, i) => (
+                          <td className="px-4 py-2.5 text-center">
+                            <ConsentCheck accepted={true} />
+                          </td>
+                          {consentLabels.map((_label, i) => (
                             <td key={i} className="px-4 py-2.5 text-center">
                               <ConsentCheck accepted={accepted[i]?.accepted ?? false} />
                             </td>

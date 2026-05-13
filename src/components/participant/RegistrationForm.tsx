@@ -1,7 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ConsentBlock } from "./ConsentBlock";
 
 interface ConsentItemData {
   text: string;
@@ -41,7 +40,7 @@ function parseItems(raw: unknown): ConsentItemData[] {
 export function RegistrationForm(props: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [ageConsent, setAgeConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -52,11 +51,9 @@ export function RegistrationForm(props: Props) {
   const [itemChecks, setItemChecks] = useState<boolean[]>(() => items.map(() => false));
   const [mrqContactConsent, setMrqContactConsent] = useState(false);
   // Required items must be ticked; optional items may be unchecked.
-  const requiredItemsChecked =
-    items.length > 0
-      ? items.every((it, i) => !it.required || itemChecks[i])
-      : consentAccepted;
+  const requiredItemsChecked = items.every((it, i) => !it.required || itemChecks[i]);
   const allConsentsChecked =
+    ageConsent &&
     requiredItemsChecked &&
     (!props.mrqContactConsentEnabled || mrqContactConsent);
 
@@ -78,11 +75,14 @@ export function RegistrationForm(props: Props) {
             mrqContactConsent,
             // Snapshot the required flag at submit time so the audit trail is
             // unambiguous even if the activation's consent items are later edited.
-            consentItemsAccepted: items.map((item, i) => ({
-              text: item.text,
-              required: item.required,
-              accepted: itemChecks[i] ?? false,
-            })),
+            consentItemsAccepted: [
+              { text: "I confirm that I am 18+", required: true, accepted: true },
+              ...items.map((item, i) => ({
+                text: item.text,
+                required: item.required,
+                accepted: itemChecks[i] ?? false,
+              })),
+            ],
           }),
         });
         if (res.status === 503) {
@@ -136,8 +136,24 @@ export function RegistrationForm(props: Props) {
         />
       </div>
 
-      {/* Consent: dynamic items or fallback single checkbox */}
-      {items.length > 0 ? (
+      {/* Age consent — always first, required on every activation */}
+      <div className="flex items-start gap-2">
+        <input
+          id="reg-age-consent"
+          type="checkbox"
+          checked={ageConsent}
+          onChange={(e) => setAgeConsent(e.target.checked)}
+          required
+          className="mt-0.5 shrink-0"
+        />
+        <label htmlFor="reg-age-consent" className="text-sm leading-snug">
+          I confirm that I am 18+
+          <span className="text-destructive ml-0.5" aria-label="required">*</span>
+        </label>
+      </div>
+
+      {/* Custom consent items */}
+      {items.length > 0 && (
         <div className="space-y-2">
           {items.map((item, i) => (
             <div key={i} className="flex items-start gap-2">
@@ -168,21 +184,6 @@ export function RegistrationForm(props: Props) {
               </label>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="flex items-start gap-2">
-          <input
-            id="reg-consent"
-            type="checkbox"
-            checked={consentAccepted}
-            onChange={(e) => setConsentAccepted(e.target.checked)}
-            required
-            className="mt-0.5 shrink-0"
-          />
-          <label htmlFor="reg-consent" className="text-sm leading-snug">
-            I&apos;m 18+ and accept the{" "}
-            <ConsentBlock notice={props.consentNotice} />
-          </label>
         </div>
       )}
 

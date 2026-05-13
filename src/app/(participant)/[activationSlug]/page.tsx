@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
@@ -27,6 +28,7 @@ const getActivation = (slug: string) =>
           heroImageAlt: true,
           startsAt: true,
           termsContent: true,
+          primaryColor: true,
         },
       }),
     [`activation:${slug}`],
@@ -83,10 +85,14 @@ export default async function LandingPage({
     }
   }
 
+  const brandStyle: CSSProperties = activation.primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
+    ? ({ "--primary": activation.primaryColor, "--primary-foreground": "#ffffff" } as CSSProperties)
+    : {};
+
   if (activation.status === "SCHEDULED") {
     const { label, time } = formatLondonDateTime(activation.startsAt);
     return (
-      <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
+      <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen" style={brandStyle}>
         <div className="text-sm font-semibold tracking-tight mb-5">
           MrQ <span className="font-normal text-ink-3">Activation</span>
         </div>
@@ -106,7 +112,7 @@ export default async function LandingPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
+    <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen" style={brandStyle}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold tracking-tight">
           MrQ <span className="font-normal text-ink-3">Activation</span>

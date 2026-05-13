@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
@@ -103,8 +104,12 @@ export default async function SuccessPage({
   const sponsorCtaUrl = activation.successSponsorCtaUrl ?? null;
   const hasSponsor = !!(sponsorHeadline || sponsorBody || sponsorLogoUrl);
 
+  const brandStyle: CSSProperties = activation.primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
+    ? ({ "--primary": activation.primaryColor, "--primary-foreground": "#ffffff" } as CSSProperties)
+    : {};
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col items-center px-5 pb-8 pt-10">
+    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col items-center px-5 pb-8 pt-10" style={brandStyle}>
       {/* Header */}
       <div className="flex w-full items-center justify-between mb-8">
         <span className="text-sm font-bold tracking-tight">
@@ -143,7 +148,6 @@ export default async function SuccessPage({
         showEntryCode={showEntryCode}
         showResend={showResend}
         showCta={showCta}
-        primaryColor={activation.primaryColor}
         isPreview={isPreview}
       />
 
