@@ -76,7 +76,7 @@ export function SuccessSessionData({
   return (
     <>
       {maskedEmail && (
-        <p className="text-sm text-muted-foreground">
+        <p className="w-full text-sm text-muted-foreground">
           We&apos;ve sent a confirmation to{" "}
           <span className="underline">{maskedEmail}</span>.
         </p>

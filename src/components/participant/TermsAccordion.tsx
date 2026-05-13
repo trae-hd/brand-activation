@@ -49,13 +49,13 @@ function renderNode(node: unknown, key: number): React.ReactNode {
     }
     case "bulletList":
       return (
-        <ul key={key} className="list-disc list-inside text-xs space-y-0.5 break-words">
+        <ul key={key} className="list-disc list-inside text-xs space-y-2 break-words">
           {(n.content ?? []).map((c, i) => renderNode(c, i))}
         </ul>
       );
     case "orderedList":
       return (
-        <ol key={key} className="list-decimal list-inside text-xs space-y-0.5 break-words">
+        <ol key={key} className="list-decimal list-inside text-xs space-y-2 break-words">
           {(n.content ?? []).map((c, i) => renderNode(c, i))}
         </ol>
       );
