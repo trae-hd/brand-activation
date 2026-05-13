@@ -88,7 +88,7 @@ export default async function LandingPage({
     return (
       <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
         <div className="text-sm font-semibold tracking-tight mb-5">
-          MrQ <span className="font-normal text-ink-3">live</span>
+          MrQ <span className="font-normal text-ink-3">Activation</span>
         </div>
         <div className="rounded-md border border-border p-4">
           <p className="text-xs font-bold tracking-widest uppercase text-primary mb-1 break-words">
@@ -109,7 +109,7 @@ export default async function LandingPage({
     <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold tracking-tight">
-          MrQ <span className="font-normal text-ink-3">live</span>
+          MrQ <span className="font-normal text-ink-3">Activation</span>
         </div>
         {sp.booth && (
           <span className="text-xs text-ink-3">Booth #{sp.booth}</span>

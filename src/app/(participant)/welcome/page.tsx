@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ParticipantGate } from "../_components/ParticipantGate";
 
 export const metadata: Metadata = {
-  title: "MrQ Live",
+  title: "MrQ Activation",
   robots: { index: false, follow: false },
 };
 

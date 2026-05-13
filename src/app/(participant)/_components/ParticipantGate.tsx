@@ -47,7 +47,7 @@ export function ParticipantGate({ variant }: ParticipantGateProps) {
         <div className="flex items-center gap-2.5">
           <Mark className="h-5 w-5 text-indigo-400" />
           <span className="text-[13px] font-medium tracking-tight text-zinc-200">
-            MrQ <span className="text-zinc-500">Live</span>
+            MrQ <span className="text-zinc-500">Activation</span>
           </span>
         </div>
       </header>

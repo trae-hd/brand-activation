@@ -21,7 +21,7 @@ export default async function ExpiredPage({
   return (
     <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen">
       <div className="mb-5 text-sm font-semibold tracking-tight">
-        MrQ <span className="font-normal text-ink-3">live</span>
+        MrQ <span className="font-normal text-ink-3">Activation</span>
       </div>
       <div className="space-y-4 rounded-md border border-warn/40 bg-warn/5 p-4">
         <div>

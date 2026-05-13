@@ -108,7 +108,7 @@ export default async function SuccessPage({
       {/* Header */}
       <div className="flex w-full items-center justify-between mb-8">
         <span className="text-sm font-bold tracking-tight">
-          MrQ <span className="font-normal opacity-60">live</span>
+          MrQ <span className="font-normal opacity-60">Activation</span>
         </span>
         <span className="rounded-full border border-green-600 px-2 py-0.5 text-xs font-semibold text-green-600">
           VERIFIED

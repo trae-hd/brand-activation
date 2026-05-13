@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "MrQ Live",
-  description: "MrQ Live Activation",
+  title: "MrQ Activation",
+  description: "MrQ Activation",
 };
 
 // Phase 1 shell. Participant chrome (offline handling, mobile layout) added in Phase 5.
