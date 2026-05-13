@@ -576,7 +576,7 @@ Mirrors the V5 phased-delivery convention, scaled to this feature's scope. Each 
 - [ ] Admin audit page filters work for the three new audit actions.
 - [ ] DSAR export includes `confirmationEmailSentAt` for at least one VERIFIED row.
 - [ ] Production deploy via Railway Release Command applies the migration successfully.
-- [ ] Within 1 hour of production deploy: extended smoke test passes against `live.hqmops.com`. Resend dashboard shows healthy delivery rate (no spike in bounces or rejections relative to the existing OTP send).
+- [ ] Within 1 hour of production deploy: extended smoke test passes against `activation.mrq.com`. Resend dashboard shows healthy delivery rate (no spike in bounces or rejections relative to the existing OTP send).
 - [ ] BACKLOG 1.3 marked as closed in `BACKLOG.md`.
 
 **Rollback:**

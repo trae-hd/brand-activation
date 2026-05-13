@@ -67,7 +67,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
   const { tab, preview, setTab, setPreview } = useTabUrlState();
   const isAdmin = userRole === "ADMIN";
   const isCreator = !!currentUserId && currentUserId === initialData?.createdById;
-  // Display-only host (e.g. "live.hqmops.com") — derived from the env-driven
+  // Display-only host (e.g. "activation.mrq.com") — derived from the env-driven
   // base URL so labels track whichever domain the deployment is serving.
   const participantHost = new URL(participantBaseUrl).host;
 

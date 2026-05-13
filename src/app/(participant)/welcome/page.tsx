@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 // Internal target for the participant-host root rewrite. The proxy rewrites
-// `live.hqmops.com/` → `/welcome`, so the URL bar still shows `/`.
+// `activation.mrq.com/` → `/welcome`, so the URL bar still shows `/`.
 // Direct visits to `/welcome` are harmless — they show the same gate.
 export default function ParticipantRootPage() {
   return <ParticipantGate variant="root" />;

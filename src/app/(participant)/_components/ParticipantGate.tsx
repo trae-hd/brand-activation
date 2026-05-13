@@ -1,7 +1,7 @@
 /**
  * Empty/landing state served at:
- *   - live.hqmops.com/                 → variant="root"        (via proxy rewrite to /welcome)
- *   - live.hqmops.com/<unknown-slug>   → variant="not-found"   (via [activationSlug]/not-found.tsx)
+ *   - activation.mrq.com/                 → variant="root"        (via proxy rewrite to /welcome)
+ *   - activation.mrq.com/<unknown-slug>   → variant="not-found"   (via [activationSlug]/not-found.tsx)
  *
  * Calm, type-led page. Static — no state beyond the prop. No marketing,
  * no forms, no images, no DB calls. Brand-light by design (multi-tenant host).

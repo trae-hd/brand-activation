@@ -52,7 +52,7 @@ interface Props {
   // Registration preview fields
   name: string;
   slug: string;
-  /** Display-only host (e.g. "live.hqmops.com") shown in the preview URL strip. */
+  /** Display-only host (e.g. "activation.mrq.com") shown in the preview URL strip. */
   participantHost: string;
   heroImageUrl: string;
   content: unknown;
