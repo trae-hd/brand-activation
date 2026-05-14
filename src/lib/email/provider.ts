@@ -35,7 +35,7 @@ export type EmailSendFailure = {
 export type EmailSendSuccess = { ok: true; messageId: string };
 
 export interface EmailProvider {
-  sendOtp(args: { to: string; otp: string }): Promise<EmailSendSuccess | EmailSendFailure>;
+  sendOtp(args: { to: string; otp: string; primaryColor?: string | null }): Promise<EmailSendSuccess | EmailSendFailure>;
   sendInvite(args: {
     to: string;
     name: string;

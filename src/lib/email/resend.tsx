@@ -126,9 +126,9 @@ function toProviderResult(result: SendWithRetryResult): EmailSendSuccess | Email
 }
 
 export const resendProvider: EmailProvider = {
-  sendOtp: async ({ to, otp }) => {
+  sendOtp: async ({ to, otp, primaryColor }) => {
     const formatted = otp.replace(/\s/g, "").replace(/^(\d{3})(\d{3})$/, "$1 $2");
-    const html = await render(React.createElement(OtpEmail, { otp, to }));
+    const html = await render(React.createElement(OtpEmail, { otp, to, primaryColor }));
     const text = `Your MrQ Activation verification code is ${formatted}.\n\nIt expires in 10 minutes. We will never ask for this code over email, chat or phone.\n\nIf you didn't try to sign in, you can safely ignore this email.`;
     return toProviderResult(
       await sendWithRetry({ to, subject: `Your MrQ Activation code: ${formatted}`, html, text }),

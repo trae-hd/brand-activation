@@ -18,9 +18,10 @@ const MONO = '"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace';
 export interface OtpEmailProps {
   otp: string;
   to: string;
+  primaryColor?: string | null;
 }
 
-export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailProps) {
+export function OtpEmail({ otp = "482619", to = "you@example.com", primaryColor }: OtpEmailProps) {
   // Render OTP as a single contiguous 6-digit string (no space). Two reasons:
   //   1. The previous "XXX XXX" formatting wrapped to two lines on narrow
   //      mobile email clients (the space is a line-break opportunity).
@@ -82,19 +83,6 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                         Activation
                       </span>
                     </Column>
-                    <Column align="right">
-                      <Text
-                        style={{
-                          margin: 0,
-                          fontFamily: MONO,
-                          fontSize: 11,
-                          color: "#a8a29e",
-                          letterSpacing: "0.5px",
-                        }}
-                      >
-                        Sign-in
-                      </Text>
-                    </Column>
                   </Row>
                 </Column>
               </Row>
@@ -135,8 +123,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                 <Column style={{ padding: "0 32px 8px" }}>
                   <Section
                     style={{
-                      backgroundColor: "#fafaf9",
-                      border: "1px solid #e7e5e4",
+                      backgroundColor: primaryColor ?? "#1c1917",
                       borderRadius: 10,
                     }}
                   >
@@ -148,7 +135,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                             fontFamily: MONO,
                             fontSize: 44,
                             fontWeight: 700,
-                            color: "#1c1917",
+                            color: "#ffffff",
                             // Tighter spacing than before (was 14px) so 6
                             // digits fit on one line in narrower email
                             // clients and the digits read as one chunk.
@@ -164,7 +151,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                           style={{
                             margin: "10px 0 0",
                             fontSize: 12,
-                            color: "#a8a29e",
+                            color: "rgba(255,255,255,0.7)",
                             letterSpacing: "0.4px",
                             fontFamily: FONT,
                           }}

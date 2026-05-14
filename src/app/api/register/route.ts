@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
     const activation = await prisma.activation.findUnique({
       where: { id: activationId },
-      select: { id: true, status: true, consentVersion: true },
+      select: { id: true, status: true, consentVersion: true, primaryColor: true },
     });
 
     // No-op for any state that shouldn't issue an OTP; opaque shape preserved.
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
 
     const { otp } = await issueOtp(registrationId);
 
-    const sendResult = await emailProvider.sendOtp({ to: email, otp });
+    const sendResult = await emailProvider.sendOtp({ to: email, otp, primaryColor: activation.primaryColor });
     if (!sendResult.ok) return ERR(503);
 
     return OK_202(signPendingToken({ kind: "issued", registrationId }));
