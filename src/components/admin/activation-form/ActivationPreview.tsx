@@ -417,7 +417,7 @@ function InlineEmailPreview({
 
           {/* "Here's your entry code:" — below body, above block */}
           {showEntryCode && (
-            <div className="px-6 pb-1">
+            <div className="px-6 pb-4">
               <p className="text-xs text-[#57534e]">Here&apos;s your entry code:</p>
             </div>
           )}

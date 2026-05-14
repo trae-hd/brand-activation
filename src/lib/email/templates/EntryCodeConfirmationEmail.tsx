@@ -318,7 +318,7 @@ export function EntryCodeConfirmationEmail({
               {/* Entry code block */}
               {showEntryCode && (
                 <Row>
-                  <Column style={{ padding: "0 32px 8px" }}>
+                  <Column style={{ padding: "16px 32px 8px" }}>
                     <Section style={{ backgroundColor: primaryColor ?? "#1c1917", borderRadius: 10 }}>
                       <Row>
                         <Column style={{ textAlign: "center", padding: "26px 16px 24px" }}>
