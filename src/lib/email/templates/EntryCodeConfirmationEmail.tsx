@@ -134,7 +134,7 @@ export function EntryCodeConfirmationEmail({
                           lineHeight: "1",
                         }}
                       >
-                        Live
+                        Activation
                       </span>
                     </Column>
                     <Column align="right">

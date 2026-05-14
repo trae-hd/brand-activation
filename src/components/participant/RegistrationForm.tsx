@@ -146,7 +146,7 @@ export function RegistrationForm(props: Props) {
           required
           className="mt-0.5 shrink-0"
         />
-        <label htmlFor="reg-age-consent" className="text-sm leading-snug">
+        <label htmlFor="reg-age-consent" className="text-sm leading-snug min-w-0">
           I confirm that I am 18+
           <span className="text-destructive ml-0.5" aria-label="required">*</span>
         </label>
@@ -198,7 +198,7 @@ export function RegistrationForm(props: Props) {
             required
             className="mt-0.5 shrink-0"
           />
-          <label htmlFor="reg-consent-mrq" className="text-sm leading-snug">
+          <label htmlFor="reg-consent-mrq" className="text-sm leading-snug min-w-0">
             I agree to be contacted by MrQ if I am selected as a winner.
           </label>
         </div>
