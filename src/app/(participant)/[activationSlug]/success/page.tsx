@@ -55,7 +55,7 @@ type TNode = {
 function renderInline(nodes: unknown[]): React.ReactNode {
   return (nodes as TNode[]).map((n, i) => {
     if (n.type !== "text") {
-      if (n.content) return <React.Fragment key={i}>{renderInline(n.content)}</React.Fragment>;
+      if (Array.isArray(n.content)) return <React.Fragment key={i}>{renderInline(n.content)}</React.Fragment>;
       return null;
     }
     let el: React.ReactNode = n.text ?? "";

@@ -68,7 +68,7 @@ function renderInline(nodes: unknown[]): React.ReactNode {
   return nodes.map((n, i) => {
     const node = n as { type?: string; text?: string; marks?: Array<{ type: string; attrs?: Record<string, unknown> }>; content?: unknown[] };
     if (node.type !== "text") {
-      if (node.content) return <React.Fragment key={i}>{renderInline(node.content)}</React.Fragment>;
+      if (Array.isArray(node.content)) return <React.Fragment key={i}>{renderInline(node.content)}</React.Fragment>;
       return null;
     }
     let content: React.ReactNode = node.text ?? "";
