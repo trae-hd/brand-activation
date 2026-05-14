@@ -58,6 +58,17 @@ export interface EmailProvider {
      * on-demand send from `/api/resend-confirmation-email`. Threads through
      * to the email template's headline + the audit row's `metadata.cause`. */
     cause: "verify" | "resend";
+    // Per-activation email customisation
+    emailSubject?: string | null;
+    emailPreheader?: string | null;
+    emailHeading?: string | null;
+    emailBodyContent?: unknown | null;
+    emailBodyCopy?: string | null;
+    emailShowEntryCode?: boolean | null;
+    emailShowEndDate?: boolean | null;
+    emailTermsContent?: unknown | null;
+    emailFooter?: string | null;
+    primaryColor?: string | null;
   }): Promise<EmailSendSuccess | EmailSendFailure>;
 }
 

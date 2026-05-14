@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Allowlist } from "./allowlists";
+import { ALLOWED_FONT_SIZES } from "./allowlists";
 
 const TiptapNode: z.ZodType<unknown> = z.lazy(() =>
   z.object({
@@ -33,6 +34,11 @@ export function validateAgainstAllowlist(
     if (!allowlist.nodes.includes(n.type as never)) return `node:${n.type}`;
     for (const m of n.marks ?? []) {
       if (!allowlist.marks.includes(m.type as never)) return `mark:${m.type}`;
+      if (m.type === "textStyle") {
+        const fontSize = (m as { type: string; attrs?: { fontSize?: unknown } }).attrs?.fontSize;
+        if (fontSize != null && !ALLOWED_FONT_SIZES.includes(fontSize as never))
+          return `mark:textStyle:fontSize:${fontSize}`;
+      }
     }
     for (const c of n.content ?? []) {
       const v = walk(c);

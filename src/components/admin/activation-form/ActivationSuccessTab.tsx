@@ -298,6 +298,22 @@ export function ActivationSuccessTab({ value, onChange, onAnyChange, activationI
             className="text-sm"
           />
         </div>
+
+        {/* ── Sponsor T&Cs ────────────────────────────────────────── */}
+        <div className="flex flex-col gap-1.5">
+          <SectionLabel>
+            Offer T&amp;Cs{" "}
+            <span className="text-muted-foreground/60 tracking-normal normal-case">(optional)</span>
+          </SectionLabel>
+          <p className="text-muted-foreground text-xs mb-1">
+            Required in the UK when promoting offers. Shown as a &ldquo;T&amp;Cs apply&rdquo; toggle on the success page — participants tap to expand.
+          </p>
+          <TiptapEditor
+            content={value.successSponsorTermsContent}
+            onChange={(v) => set("successSponsorTermsContent", v)}
+            allowlist={CONTENT_ALLOWLIST}
+          />
+        </div>
       </div>
 
       {hasSponsor && (

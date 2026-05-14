@@ -17,14 +17,15 @@ function flatText(nodes: unknown[]): string {
 
 function renderInline(nodes: unknown[]): React.ReactNode {
   return nodes.map((n, i) => {
-    const node = n as { type?: string; text?: string; marks?: Array<{ type: string }> };
+    const node = n as { type?: string; text?: string; marks?: Array<{ type: string; attrs?: Record<string, unknown> }> };
     if (node.type !== "text") return null;
     let content: React.ReactNode = node.text ?? "";
     const marks = node.marks ?? [];
     if (marks.some((m) => m.type === "bold")) content = <strong key={i}>{content}</strong>;
     if (marks.some((m) => m.type === "italic")) content = <em key={i}>{content}</em>;
-    if (marks.some((m) => m.type === "underline"))
-      content = <u key={i}>{content}</u>;
+    if (marks.some((m) => m.type === "underline")) content = <u key={i}>{content}</u>;
+    const fontSize = marks.find((m) => m.type === "textStyle")?.attrs?.fontSize as string | undefined;
+    if (fontSize) content = <span key={i} style={{ fontSize }}>{content}</span>;
     return <React.Fragment key={i}>{content}</React.Fragment>;
   });
 }

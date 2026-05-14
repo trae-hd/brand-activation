@@ -76,44 +76,32 @@ export function SuccessSessionData({
   return (
     <>
       {maskedEmail && (
-        <p className="w-full text-sm text-muted-foreground">
+        <p className="mt-4 w-full text-sm text-muted-foreground">
           We&apos;ve sent a confirmation to{" "}
           <span className="underline">{maskedEmail}</span>.
         </p>
       )}
 
       {showEntryCode && session.entryCode && (
-        <div className="mt-5 w-full rounded-md bg-primary p-4 text-primary-foreground">
+        <div className="mt-6 w-full rounded-md bg-primary p-4 text-primary-foreground">
           <p className="text-xs font-semibold uppercase tracking-widest">
             Your entry code
           </p>
           <p className="mt-1 font-mono text-3xl font-bold tracking-wider">
             {session.entryCode}
           </p>
-          <p className="mt-1 text-xs">
-            Keep this handy — you&apos;ll need it later.
-          </p>
         </div>
       )}
 
       {showCta && (
-        successCtaUrl ? (
-          <a
-            href={successCtaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 block w-full rounded-md bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
-          >
-            {successCtaLabel}
-          </a>
-        ) : (
-          <button
-            type="button"
-            className="mt-4 w-full rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
-          >
-            {successCtaLabel}
-          </button>
-        )
+        <a
+          href={successCtaUrl || "mailto:"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 block w-full rounded-md bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground"
+        >
+          {successCtaLabel}
+        </a>
       )}
 
       {showResend && (

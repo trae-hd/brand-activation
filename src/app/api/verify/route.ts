@@ -77,7 +77,21 @@ export async function POST(req: Request) {
     const activation = reg
       ? await prisma.activation.findUnique({
           where: { id: reg.activationId },
-          select: { entryCodePrefix: true, name: true, endsAt: true },
+          select: {
+            entryCodePrefix: true,
+            name: true,
+            endsAt: true,
+            emailSubject: true,
+            emailPreheader: true,
+            emailHeading: true,
+            emailBodyContent: true,
+            emailBodyCopy: true,
+            emailShowEntryCode: true,
+            emailShowEndDate: true,
+            emailTermsContent: true,
+            emailFooter: true,
+            primaryColor: true,
+          },
         })
       : null;
 
@@ -143,6 +157,16 @@ export async function POST(req: Request) {
           activationEndsAt: activation.endsAt,
           supportEmail,
           cause: "verify",
+          emailSubject: activation.emailSubject,
+          emailPreheader: activation.emailPreheader,
+          emailHeading: activation.emailHeading,
+          emailBodyContent: activation.emailBodyContent,
+          emailBodyCopy: activation.emailBodyCopy,
+          emailShowEntryCode: activation.emailShowEntryCode,
+          emailShowEndDate: activation.emailShowEndDate,
+          emailTermsContent: activation.emailTermsContent,
+          emailFooter: activation.emailFooter,
+          primaryColor: activation.primaryColor,
         });
 
         if (result.ok) {

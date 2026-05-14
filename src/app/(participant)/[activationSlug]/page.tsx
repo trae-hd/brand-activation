@@ -1,3 +1,4 @@
+import React from "react";
 import { notFound, redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import Image from "next/image";
@@ -19,6 +20,7 @@ const getActivation = (slug: string) =>
           slug: true,
           name: true,
           status: true,
+          content: true,
           consentNotice: true,
           consentVersion: true,
           consentItems: true,
@@ -32,7 +34,7 @@ const getActivation = (slug: string) =>
         },
       }),
     [`activation:${slug}`],
-    { tags: [`activation:${slug}`], revalidate: 60 }
+    { tags: [`activation:${slug}`], revalidate: 60 },
   )();
 
 function formatLondonDateTime(date: Date): { label: string; time: string } {
@@ -62,6 +64,65 @@ function formatLondonDateTime(date: Date): { label: string; time: string } {
   return { label: `${day} ${month} · ${time} ${tz}`, time: `${time} ${tz}` };
 }
 
+function renderInline(nodes: unknown[]): React.ReactNode {
+  return nodes.map((n, i) => {
+    const node = n as { type?: string; text?: string; marks?: Array<{ type: string; attrs?: Record<string, unknown> }>; content?: unknown[] };
+    if (node.type !== "text") {
+      if (node.content) return <React.Fragment key={i}>{renderInline(node.content)}</React.Fragment>;
+      return null;
+    }
+    let content: React.ReactNode = node.text ?? "";
+    const marks = node.marks ?? [];
+    if (marks.some((m) => m.type === "bold")) content = <strong className="font-semibold">{content}</strong>;
+    if (marks.some((m) => m.type === "italic")) content = <em>{content}</em>;
+    if (marks.some((m) => m.type === "underline")) content = <u>{content}</u>;
+    const fontSize = marks.find((m) => m.type === "textStyle")?.attrs?.fontSize as string | undefined;
+    if (fontSize) content = <span style={{ fontSize }}>{content}</span>;
+    const linkMark = marks.find((m) => m.type === "link");
+    if (linkMark?.attrs?.href) content = <a href={String(linkMark.attrs.href)} target="_blank" rel="noopener noreferrer" className="underline">{content}</a>;
+    return <React.Fragment key={i}>{content}</React.Fragment>;
+  });
+}
+
+type TNode = {
+  type?: string;
+  text?: string;
+  content?: unknown[];
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  attrs?: Record<string, unknown>;
+};
+
+function MarketingCopy({ doc }: { doc: unknown }) {
+  if (!doc || typeof doc !== "object") return null;
+  const root = doc as { content?: unknown[] };
+  if (!Array.isArray(root.content)) return null;
+  const nodes: React.ReactNode[] = [];
+  (root.content as TNode[]).forEach((node, i) => {
+    if (node.type === "paragraph") {
+      const hasText = (node.content ?? []).some((n) => (n as TNode).type === "text" && (n as TNode).text?.trim());
+      if (!hasText) return;
+      nodes.push(<p key={i} className="text-ink-3 text-sm leading-relaxed">{renderInline(node.content ?? [])}</p>);
+    } else if (node.type === "heading") {
+      const level = (node.attrs?.level as number) ?? 2;
+      nodes.push(<p key={i} className={level <= 2 ? "text-ink-1 text-base font-semibold leading-snug" : "text-ink-1 text-sm font-semibold leading-snug"}>{renderInline(node.content ?? [])}</p>);
+    } else if (node.type === "bulletList") {
+      (node.content ?? []).forEach((item, j) => {
+        const li = item as TNode;
+        const textNodes = (li.content ?? []).flatMap((p) => (p as TNode).content ?? []);
+        nodes.push(<p key={`${i}-${j}`} className="text-ink-3 text-sm leading-relaxed">• {renderInline(textNodes)}</p>);
+      });
+    } else if (node.type === "orderedList") {
+      (node.content ?? []).forEach((item, j) => {
+        const li = item as TNode;
+        const textNodes = (li.content ?? []).flatMap((p) => (p as TNode).content ?? []);
+        nodes.push(<p key={`${i}-${j}`} className="text-ink-3 text-sm leading-relaxed">{j + 1}. {renderInline(textNodes)}</p>);
+      });
+    }
+  });
+  if (!nodes.length) return null;
+  return <div className="mb-3 flex flex-col gap-3">{nodes}</div>;
+}
+
 export default async function LandingPage({
   params,
   searchParams,
@@ -86,43 +147,48 @@ export default async function LandingPage({
   }
 
   const brandStyle: CSSProperties = activation.primaryColor?.match(/^#[0-9a-fA-F]{6}$/)
-    ? ({ "--primary": activation.primaryColor, "--primary-foreground": "#ffffff" } as CSSProperties)
+    ? ({
+        "--primary": activation.primaryColor,
+        "--primary-foreground": "#ffffff",
+      } as CSSProperties)
     : {};
 
   if (activation.status === "SCHEDULED") {
     const { label, time } = formatLondonDateTime(activation.startsAt);
     return (
-      <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen" style={brandStyle}>
-        <div className="text-sm font-semibold tracking-tight mb-5">
-          MrQ <span className="font-normal text-ink-3">Activation</span>
+      <main
+        className="mx-auto min-h-screen w-full max-w-sm px-5 pt-5 pb-8"
+        style={brandStyle}
+      >
+        <div className="mb-5 text-sm font-semibold tracking-tight">
+          MrQ <span className="text-ink-3 font-normal">Activation</span>
         </div>
-        <div className="rounded-md border border-border p-4">
-          <p className="text-xs font-bold tracking-widest uppercase text-primary mb-1 break-words">
+        <div className="border-border rounded-md border p-4">
+          <p className="text-primary mb-1 text-xs font-bold tracking-widest break-words uppercase">
             OPENS · {label}
           </p>
-          <h1 className="text-xl font-bold leading-snug mb-2">
+          <h1 className="mb-2 text-xl leading-snug font-bold">
             Doors aren&apos;t open yet.
           </h1>
-          <p className="text-sm text-ink-3">
-            Pop back at {time} when doors open.
-          </p>
+          <p className="text-ink-3 text-sm">Pop back at {time} when doors open.</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-sm px-5 pt-5 pb-8 min-h-screen" style={brandStyle}>
-      <div className="flex items-center justify-between mb-3">
+    <main
+      className="mx-auto min-h-screen w-full max-w-sm px-5 pt-5 pb-8"
+      style={brandStyle}
+    >
+      <div className="mb-6 flex items-center justify-between">
         <div className="text-sm font-semibold tracking-tight">
-          MrQ <span className="font-normal text-ink-3">Activation</span>
+          MrQ <span className="text-ink-3 font-normal">Activation</span>
         </div>
-        {sp.booth && (
-          <span className="text-xs text-ink-3">Booth #{sp.booth}</span>
-        )}
+        {sp.booth && <span className="text-ink-3 text-xs">Booth #{sp.booth}</span>}
       </div>
       {activation.heroImageUrl && (
-        <div className="relative mb-4 w-full overflow-hidden rounded-md aspect-[2/1]">
+        <div className="relative mb-4 aspect-[2/1] w-full overflow-hidden rounded-md">
           <Image
             src={activation.heroImageUrl}
             alt={activation.heroImageAlt ?? ""}
@@ -132,9 +198,12 @@ export default async function LandingPage({
           />
         </div>
       )}
-      <h1 className="text-2xl font-bold leading-tight mb-2 break-words">{activation.name}</h1>
-      <p className="text-sm text-ink-3 mb-4">
-        Pop your email in. We&apos;ll send a code.
+      <h1 className="mb-3 text-2xl leading-tight font-bold break-words">
+        {activation.name}
+      </h1>
+      {activation.content && <MarketingCopy doc={activation.content} />}
+      <p className="text-ink-3 mb-4 text-sm">
+        Pop your email in to enter. We&apos;ll send a code.
       </p>
       <RegistrationForm
         activationId={activation.id}
@@ -149,7 +218,7 @@ export default async function LandingPage({
         mrqContactConsentEnabled={activation.mrqContactConsentEnabled}
         ctaText={activation.ctaText ?? null}
       />
-      <hr className="my-4 border-border" />
+      <hr className="border-border my-4" />
       <TermsAccordion content={activation.termsContent} />
     </main>
   );

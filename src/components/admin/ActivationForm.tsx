@@ -15,6 +15,7 @@ import type {
   BoothRow,
   RegistrationFormState,
   SuccessFormState,
+  EmailFormState,
 } from "@/types/activation";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { ActivationFormBooths } from "./activation-form/ActivationFormBooths";
@@ -25,6 +26,7 @@ import { ActivationFormSaveBar } from "./activation-form/ActivationFormSaveBar";
 import { ActivationPreview } from "./activation-form/ActivationPreview";
 import { ActivationRegistrationTab } from "./activation-form/ActivationRegistrationTab";
 import { ActivationSuccessTab } from "./activation-form/ActivationSuccessTab";
+import { ActivationEmailTab } from "./activation-form/ActivationEmailTab";
 import { SectionLabel, Rule } from "./activation-form/form-section";
 import { useTabUrlState } from "@/lib/admin/useTabUrlState";
 import { useUnsavedChangesGuard } from "@/lib/admin/useUnsavedChangesGuard";
@@ -129,6 +131,20 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
     successSponsorBody: initialData?.successSponsorBody ?? "",
     successSponsorCtaLabel: initialData?.successSponsorCtaLabel ?? "",
     successSponsorCtaUrl: initialData?.successSponsorCtaUrl ?? "",
+    successSponsorTermsContent: initialData?.successSponsorTermsContent ?? EMPTY_DOC,
+  });
+
+  // ── Verification email tab state ──────────────────────────────────
+  const [email, setEmail] = useState<EmailFormState>({
+    emailSubject: initialData?.emailSubject ?? "",
+    emailPreheader: initialData?.emailPreheader ?? "",
+    emailHeading: initialData?.emailHeading ?? "",
+    emailBodyContent: initialData?.emailBodyContent ?? EMPTY_DOC,
+    emailBodyCopy: initialData?.emailBodyCopy ?? "",
+    emailShowEntryCode: initialData?.emailShowEntryCode ?? true,
+    emailShowEndDate: initialData?.emailShowEndDate ?? true,
+    emailTermsContent: initialData?.emailTermsContent ?? EMPTY_DOC,
+    emailFooter: initialData?.emailFooter ?? "",
   });
 
   // ── Review state ───────────────────────────────────────────────────
@@ -196,10 +212,21 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         successSponsorBody: success.successSponsorBody.trim() || null,
         successSponsorCtaLabel: success.successSponsorCtaLabel.trim() || null,
         successSponsorCtaUrl: success.successSponsorCtaUrl.trim() || null,
+        successSponsorTermsContent: success.successSponsorTermsContent,
         utmSource: utmSource.trim() || null,
         utmMedium: utmMedium.trim() || null,
         utmCampaign: utmCampaign.trim() || null,
         mrqContactConsentEnabled: registration.mrqContactConsentEnabled,
+        // Verification email fields
+        emailSubject: email.emailSubject.trim() || null,
+        emailPreheader: email.emailPreheader.trim() || null,
+        emailHeading: email.emailHeading.trim() || null,
+        emailBodyContent: email.emailBodyContent,
+        emailBodyCopy: email.emailBodyCopy.trim() || null,
+        emailShowEntryCode: email.emailShowEntryCode,
+        emailShowEndDate: email.emailShowEndDate,
+        emailTermsContent: email.emailTermsContent,
+        emailFooter: email.emailFooter.trim() || null,
       };
       if (mode === "create") {
         const result = await trpc.activation.create.mutate(payload);
@@ -342,11 +369,18 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
 
         {/* ── Tab selector ── */}
         <div className="flex rounded-md border overflow-hidden text-sm font-medium">
-          {(["registration", "success"] as const).map((t) => {
-            const previewHref =
-              mode === "edit" && slug
-                ? `${participantBaseUrl}/${slug}${t === "success" ? "/success" : ""}?preview=true${previewToken ? `&pt=${previewToken}` : ""}`
-                : null;
+          {(["registration", "success", "email"] as const).map((t) => {
+            let previewHref: string | null = null;
+            if (mode === "edit" && slug) {
+              if (t === "registration") {
+                previewHref = `${participantBaseUrl}/${slug}?preview=true${previewToken ? `&pt=${previewToken}` : ""}`;
+              } else if (t === "success") {
+                previewHref = `${participantBaseUrl}/${slug}/success?preview=true${previewToken ? `&pt=${previewToken}` : ""}`;
+              } else if (t === "email" && initialData?.id) {
+                previewHref = `/api/email-preview/${initialData.id}${previewToken ? `?pt=${previewToken}` : ""}`;
+              }
+            }
+            const label = t === "registration" ? "Registration page" : t === "success" ? "Success page" : "Verification email";
             return (
               <div
                 key={t}
@@ -357,10 +391,10 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
               >
                 <button
                   type="button"
-                  onClick={() => setTab(t)}
+                  onClick={() => setTab(t, t)}
                   className="flex-1 py-2"
                 >
-                  {t === "registration" ? "Registration page" : "Success page"}
+                  {label}
                 </button>
                 {previewHref && (
                   <a
@@ -368,7 +402,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    title={`Preview ${t} page`}
+                    title={`Preview ${label.toLowerCase()}`}
                     className={cn(
                       "pr-3 opacity-60 hover:opacity-100 transition-opacity",
                       tab === t ? "text-background" : "text-muted-foreground",
@@ -389,7 +423,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
             onChange={setRegistration}
             onAnyChange={markDirty}
           />
-        ) : (
+        ) : tab === "success" ? (
           <ActivationSuccessTab
             value={success}
             onChange={setSuccess}
@@ -400,6 +434,14 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
             startsAt={startsAt}
             endsAt={endsAt}
             entryCodePrefix={entryCodePrefix}
+          />
+        ) : (
+          <ActivationEmailTab
+            value={email}
+            onChange={setEmail}
+            onAnyChange={markDirty}
+            activationId={initialData?.id}
+            mode={mode}
           />
         )}
 
@@ -487,7 +529,14 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
       {/* ── Right: live preview ── */}
       <ActivationPreview
         preview={preview}
-        onPreviewChange={setPreview}
+        onPreviewChange={(v) => setTab(v, v)}
+        emailPreviewUrl={
+          mode === "edit" && initialData?.id
+            ? `/api/email-preview/${initialData.id}${previewToken ? `?pt=${previewToken}` : ""}`
+            : null
+        }
+        emailState={email}
+        activationName={name}
         name={name}
         slug={slug}
         participantHost={participantHost}
@@ -510,6 +559,7 @@ export function ActivationForm({ mode, userRole, currentUserId, initialData, par
         successSponsorHeadline={success.successSponsorHeadline}
         successSponsorBody={success.successSponsorBody}
         successSponsorCtaLabel={success.successSponsorCtaLabel}
+        successSponsorTermsContent={success.successSponsorTermsContent}
       />
     </div>
   );

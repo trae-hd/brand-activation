@@ -62,6 +62,19 @@ export interface SuccessFormState {
   successSponsorBody: string;
   successSponsorCtaLabel: string;
   successSponsorCtaUrl: string;
+  successSponsorTermsContent: unknown;
+}
+
+export interface EmailFormState {
+  emailSubject: string;
+  emailPreheader: string;
+  emailHeading: string;
+  emailBodyContent: unknown;
+  emailBodyCopy: string;
+  emailShowEntryCode: boolean;
+  emailShowEndDate: boolean;
+  emailTermsContent: unknown;
+  emailFooter: string;
 }
 
 // ── Full initial data shape returned from DB ───────────────────────────────
@@ -107,10 +120,21 @@ export interface ActivationFormInitialData {
   successSponsorBody: string | null;
   successSponsorCtaLabel: string | null;
   successSponsorCtaUrl: string | null;
+  successSponsorTermsContent: unknown;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
   mrqContactConsentEnabled: boolean;
+  // Verification email fields
+  emailSubject: string | null;
+  emailPreheader: string | null;
+  emailHeading: string | null;
+  emailBodyContent: unknown;
+  emailBodyCopy: string | null;
+  emailShowEntryCode: boolean;
+  emailShowEndDate: boolean;
+  emailTermsContent: unknown;
+  emailFooter: string | null;
 }
 
 export interface ActivationFormProps {

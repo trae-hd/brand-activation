@@ -1,12 +1,21 @@
 "use client";
 
+import { useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
+import { TextStyle } from "@tiptap/extension-text-style/text-style";
+import { FontSize } from "@tiptap/extension-text-style/font-size";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Allowlist } from "@/lib/tiptap/allowlists";
-import { CONTENT_ALLOWLIST } from "@/lib/tiptap/allowlists";
+import { CONTENT_ALLOWLIST, ALLOWED_FONT_SIZES } from "@/lib/tiptap/allowlists";
+
+const FONT_SIZE_OPTIONS = [
+  { label: "Sm", value: ALLOWED_FONT_SIZES[0] },
+  { label: "Lg", value: ALLOWED_FONT_SIZES[1] },
+  { label: "XL", value: ALLOWED_FONT_SIZES[2] },
+] as const;
 
 interface TiptapEditorProps {
   content: unknown;
@@ -19,6 +28,7 @@ interface TiptapEditorProps {
 // In Tiptap v3, link and underline are bundled into StarterKit.
 function getExtensions(allowlist: Allowlist) {
   const isContent = allowlist === CONTENT_ALLOWLIST;
+
   return [
     StarterKit.configure({
       blockquote: false,
@@ -36,6 +46,8 @@ function getExtensions(allowlist: Allowlist) {
       link: { openOnClick: false },
     }),
     ...(isContent ? [Image] : []),
+    TextStyle,
+    FontSize,
   ];
 }
 
@@ -46,6 +58,10 @@ export function TiptapEditor({
   disabled = false,
   className,
 }: TiptapEditorProps) {
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const linkInputRef = useRef<HTMLInputElement>(null);
+
   const editor = useEditor({
     extensions: getExtensions(allowlist),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,6 +113,56 @@ export function TiptapEditor({
           )}
           <Button
             type="button"
+            variant={editor.isActive("link") || showLinkInput ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (showLinkInput) {
+                setShowLinkInput(false);
+                return;
+              }
+              setLinkUrl(editor.getAttributes("link").href ?? "");
+              setShowLinkInput(true);
+              setTimeout(() => { linkInputRef.current?.focus(); linkInputRef.current?.select(); }, 30);
+            }}
+          >
+            Link
+          </Button>
+          {FONT_SIZE_OPTIONS.map(({ label, value }) => {
+            const isActive = editor.getAttributes("textStyle").fontSize === value;
+            return (
+              <Button
+                key={value}
+                type="button"
+                variant={isActive ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (isActive) {
+                    editor.chain().focus().unsetFontSize().run();
+                  } else {
+                    editor.chain().focus().setFontSize(value).run();
+                  }
+                }}
+              >
+                {label}
+              </Button>
+            );
+          })}
+          <Button
+            type="button"
+            variant={!editor.isActive("heading") && !editor.isActive("bulletList") && !editor.isActive("orderedList") ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().setParagraph().run()}
+          >
+            P
+          </Button>
+          <Button
+            type="button"
             variant={editor.isActive("heading", { level: 2 }) ? "secondary" : "ghost"}
             size="sm"
             className="h-7 px-2 text-xs"
@@ -135,6 +201,65 @@ export function TiptapEditor({
           >
             1—
           </Button>
+          {isContent && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            >
+              —
+            </Button>
+          )}
+        </div>
+      )}
+      {editor && !disabled && showLinkInput && (
+        <div className="flex items-center gap-1 rounded-md border bg-background px-2 py-1">
+          <input
+            ref={linkInputRef}
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://…"
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (linkUrl.trim()) editor.chain().focus().extendMarkRange("link").setLink({ href: linkUrl.trim() }).run();
+                setShowLinkInput(false);
+              }
+              if (e.key === "Escape") setShowLinkInput(false);
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="h-6 shrink-0 px-2 text-xs"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              if (linkUrl.trim()) editor.chain().focus().extendMarkRange("link").setLink({ href: linkUrl.trim() }).run();
+              setShowLinkInput(false);
+            }}
+          >
+            Apply
+          </Button>
+          {editor.isActive("link") && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 shrink-0 px-2 text-xs text-destructive hover:text-destructive"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                editor.chain().focus().extendMarkRange("link").unsetLink().run();
+                setShowLinkInput(false);
+              }}
+            >
+              Remove
+            </Button>
+          )}
         </div>
       )}
       <EditorContent
@@ -152,6 +277,8 @@ export function TiptapEditor({
           "[&_.tiptap_ul]:my-1 [&_.tiptap_ul]:list-disc [&_.tiptap_ul]:pl-5",
           "[&_.tiptap_ol]:my-1 [&_.tiptap_ol]:list-decimal [&_.tiptap_ol]:pl-5",
           "[&_.tiptap_li]:my-0.5 [&_.tiptap_li]:leading-snug",
+          // Horizontal rule
+          "[&_.tiptap_hr]:my-2 [&_.tiptap_hr]:border-t [&_.tiptap_hr]:border-border",
           // Inline marks
           "[&_.tiptap_strong]:font-semibold",
           "[&_.tiptap_em]:italic",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { revalidateTag } from "next/cache";
 import { router } from "../init";
@@ -8,7 +9,6 @@ import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import { validateAgainstAllowlist } from "@/lib/tiptap/validate";
 import { consentVersionOf } from "@/lib/tiptap/consentVersion";
 import { CONTENT_ALLOWLIST, CONSENT_ALLOWLIST } from "@/lib/tiptap/allowlists";
-import { Prisma } from "@prisma/client";
 import type { ActivationStatus, ActivationReviewStatus } from "@prisma/client";
 import { PHRASE_GATES, ALLOWED_TRANSITIONS } from "@/lib/activation/transitions";
 import { AUDITED_CONTENT_FIELDS } from "@/lib/activation/auditedFields";
@@ -76,11 +76,22 @@ const ActivationWriteSchema = z.object({
   successSponsorBody: z.string().max(90).optional().nullable(),
   successSponsorCtaLabel: z.string().max(100).optional().nullable(),
   successSponsorCtaUrl: z.string().url().optional().nullable(),
+  successSponsorTermsContent: z.unknown().optional().nullable(),
   // UTM defaults
   utmSource: z.string().max(100).optional().nullable(),
   utmMedium: z.string().max(100).optional().nullable(),
   utmCampaign: z.string().max(100).optional().nullable(),
   mrqContactConsentEnabled: z.boolean().optional().default(true),
+  // Verification email fields
+  emailSubject: z.string().max(200).optional().nullable(),
+  emailPreheader: z.string().max(200).optional().nullable(),
+  emailHeading: z.string().max(200).optional().nullable(),
+  emailBodyContent: z.unknown().optional().nullable(),
+  emailBodyCopy: z.string().max(500).optional().nullable(),
+  emailShowEntryCode: z.boolean().optional().default(true),
+  emailShowEndDate: z.boolean().optional().default(true),
+  emailTermsContent: z.unknown().optional().nullable(),
+  emailFooter: z.string().max(200).optional().nullable(),
 });
 
 interface ActivationListItem {
@@ -272,10 +283,21 @@ export const activationRouter = router({
           successSponsorBody: input.successSponsorBody ?? null,
           successSponsorCtaLabel: input.successSponsorCtaLabel ?? null,
           successSponsorCtaUrl: input.successSponsorCtaUrl ?? null,
+          successSponsorTermsContent: input.successSponsorTermsContent ?? Prisma.JsonNull,
           utmSource: input.utmSource ?? null,
           utmMedium: input.utmMedium ?? null,
           utmCampaign: input.utmCampaign ?? null,
           mrqContactConsentEnabled: input.mrqContactConsentEnabled ?? true,
+          // Verification email fields
+          emailSubject: input.emailSubject ?? null,
+          emailPreheader: input.emailPreheader ?? null,
+          emailHeading: input.emailHeading ?? null,
+          emailBodyContent: input.emailBodyContent ?? Prisma.JsonNull,
+          emailBodyCopy: input.emailBodyCopy ?? null,
+          emailShowEntryCode: input.emailShowEntryCode ?? true,
+          emailShowEndDate: input.emailShowEndDate ?? true,
+          emailTermsContent: input.emailTermsContent ?? Prisma.JsonNull,
+          emailFooter: input.emailFooter ?? null,
         },
         select: { id: true },
       });
@@ -340,6 +362,16 @@ export const activationRouter = router({
             successSponsorBody: true,
             successSponsorCtaLabel: true,
             successSponsorCtaUrl: true,
+            successSponsorTermsContent: true,
+            emailSubject: true,
+            emailPreheader: true,
+            emailHeading: true,
+            emailBodyContent: true,
+            emailBodyCopy: true,
+            emailShowEntryCode: true,
+            emailShowEndDate: true,
+            emailTermsContent: true,
+            emailFooter: true,
           },
         });
         if (!existing) {
@@ -427,10 +459,21 @@ export const activationRouter = router({
             successSponsorBody: input.data.successSponsorBody ?? null,
             successSponsorCtaLabel: input.data.successSponsorCtaLabel ?? null,
             successSponsorCtaUrl: input.data.successSponsorCtaUrl ?? null,
+            successSponsorTermsContent: input.data.successSponsorTermsContent ?? Prisma.JsonNull,
             utmSource: input.data.utmSource ?? null,
             utmMedium: input.data.utmMedium ?? null,
             utmCampaign: input.data.utmCampaign ?? null,
             mrqContactConsentEnabled: input.data.mrqContactConsentEnabled ?? true,
+            // Verification email fields
+            emailSubject: input.data.emailSubject ?? null,
+            emailPreheader: input.data.emailPreheader ?? null,
+            emailHeading: input.data.emailHeading ?? null,
+            emailBodyContent: input.data.emailBodyContent ?? Prisma.JsonNull,
+            emailBodyCopy: input.data.emailBodyCopy ?? null,
+            emailShowEntryCode: input.data.emailShowEntryCode ?? true,
+            emailShowEndDate: input.data.emailShowEndDate ?? true,
+            emailTermsContent: input.data.emailTermsContent ?? Prisma.JsonNull,
+            emailFooter: input.data.emailFooter ?? null,
           },
           select: { id: true },
         });
@@ -691,6 +734,7 @@ export const activationRouter = router({
           successSponsorBody: true,
           successSponsorCtaLabel: true,
           successSponsorCtaUrl: true,
+          successSponsorTermsContent: true,
         },
       });
       if (!activation) throw new TRPCError({ code: "NOT_FOUND" });

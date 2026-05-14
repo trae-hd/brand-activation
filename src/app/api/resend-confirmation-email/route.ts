@@ -96,7 +96,22 @@ export async function POST(req: Request) {
           email: true,
           status: true,
           entryCode: true,
-          activation: { select: { name: true, endsAt: true } },
+          activation: {
+            select: {
+              name: true,
+              endsAt: true,
+              emailSubject: true,
+              emailPreheader: true,
+              emailHeading: true,
+              emailBodyContent: true,
+              emailBodyCopy: true,
+              emailShowEntryCode: true,
+              emailShowEndDate: true,
+              emailTermsContent: true,
+              emailFooter: true,
+              primaryColor: true,
+            },
+          },
         },
       });
 
@@ -118,6 +133,16 @@ export async function POST(req: Request) {
         activationEndsAt: reg.activation.endsAt,
         supportEmail,
         cause: "resend",
+        emailSubject: reg.activation.emailSubject,
+        emailPreheader: reg.activation.emailPreheader,
+        emailHeading: reg.activation.emailHeading,
+        emailBodyContent: reg.activation.emailBodyContent,
+        emailBodyCopy: reg.activation.emailBodyCopy,
+        emailShowEntryCode: reg.activation.emailShowEntryCode,
+        emailShowEndDate: reg.activation.emailShowEndDate,
+        emailTermsContent: reg.activation.emailTermsContent,
+        emailFooter: reg.activation.emailFooter,
+        primaryColor: reg.activation.primaryColor,
       });
 
       if (result.ok) {

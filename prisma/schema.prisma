@@ -127,8 +127,9 @@ model Activation {
   successSponsorLogoAlt  String?
   successSponsorHeadline String?
   successSponsorBody     String?
-  successSponsorCtaLabel String?
-  successSponsorCtaUrl   String?
+  successSponsorCtaLabel    String?
+  successSponsorCtaUrl      String?
+  successSponsorTermsContent Json?
 
   // ── Default UTM parameters (pre-filled in the UTM builder) ──
   utmSource   String?
@@ -138,6 +139,17 @@ model Activation {
   // ── Consent settings ──
   /// When true, a mandatory "agree to be contacted by MrQ if winner" checkbox is shown on the registration form.
   mrqContactConsentEnabled Boolean @default(true)
+
+  // ── Verification email ──
+  emailSubject       String?
+  emailPreheader     String?
+  emailHeading       String?
+  emailBodyContent   Json?
+  emailBodyCopy      String?
+  emailShowEntryCode Boolean @default(true)
+  emailShowEndDate   Boolean @default(true)
+  emailTermsContent  Json?
+  emailFooter        String?
 
   // ── Peer review fields ──
   reviewStatus  ActivationReviewStatus @default(DRAFT)

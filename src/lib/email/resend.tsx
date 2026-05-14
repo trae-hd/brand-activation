@@ -174,26 +174,45 @@ export const resendProvider: EmailProvider = {
     );
   },
 
-  sendEntryCodeConfirmation: async ({ to, entryCode, activationName, activationEndsAt, supportEmail, cause }) => {
-    const html = await render(
-      React.createElement(EntryCodeConfirmationEmail, {
-        to,
-        entryCode,
-        activationName,
-        activationEndsAt,
-        supportEmail,
-        cause,
-      }),
-    );
-    const text = entryCodeConfirmationText({
+  sendEntryCodeConfirmation: async ({
+    to,
+    entryCode,
+    activationName,
+    activationEndsAt,
+    supportEmail,
+    cause,
+    emailSubject,
+    emailPreheader,
+    emailHeading,
+    emailBodyContent,
+    emailBodyCopy,
+    emailShowEntryCode,
+    emailShowEndDate,
+    emailTermsContent,
+    emailFooter,
+    primaryColor,
+  }) => {
+    const props = {
       to,
       entryCode,
       activationName,
       activationEndsAt,
       supportEmail,
       cause,
-    });
-    const subject = entryCodeConfirmationSubject(activationName);
+      emailSubject,
+      emailPreheader,
+      emailHeading,
+      emailBodyContent,
+      emailBodyCopy,
+      emailShowEntryCode,
+      emailShowEndDate,
+      emailTermsContent,
+      emailFooter,
+      primaryColor,
+    };
+    const html = await render(React.createElement(EntryCodeConfirmationEmail, props));
+    const text = entryCodeConfirmationText(props);
+    const subject = emailSubject?.trim() || entryCodeConfirmationSubject(activationName);
     return toProviderResult(await sendWithRetry({ to, subject, html, text }));
   },
 };
