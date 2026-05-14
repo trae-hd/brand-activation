@@ -239,14 +239,13 @@ export default function VerifyPage() {
           If a new code is required, it will arrive shortly. If you have
           already verified your email, your original entry code is still
           active — please check your confirmation email from us.
-          <br />
-          Need help?{" "}
+          {/* Need help?{" "}
           <a
-            href="mailto:hello@mrqlive.com"
+            href="mailto:hello@activation.mrq.com"
             className="underline underline-offset-2"
           >
-            hello@mrqlive.com
-          </a>
+            hello@activation.mrq.com
+          </a> */}
         </p>
       )}
 

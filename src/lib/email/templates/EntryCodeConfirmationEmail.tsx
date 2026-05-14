@@ -50,7 +50,7 @@ export function subjectFor(activationName: string): string {
 }
 
 export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
-  const { entryCode, activationName, activationEndsAt, supportEmail, cause } = args;
+  const { entryCode, activationName, activationEndsAt, cause, supportEmail: _supportEmail } = args;
   const headline =
     cause === "resend"
       ? `Here's your entry code again, as requested.`
@@ -66,7 +66,7 @@ export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
     ``,
     `The activation runs until ${formatActivationEndDate(activationEndsAt)}.`,
     ``,
-    `Need help? Contact us at ${supportEmail}. (This mailbox is not monitored — please don't reply.)`,
+    // `Need help? Contact us at ${supportEmail}.`,
     ``,
     `— The MrQ Live team`,
   ].join("\n");
@@ -77,7 +77,7 @@ export function EntryCodeConfirmationEmail({
   entryCode = "MRQ-0001",
   activationName = "Demo Activation",
   activationEndsAt = new Date("2026-12-31T23:59:00Z"),
-  supportEmail = "hello@mrqlive.com",
+  supportEmail: _supportEmail = "hello@activation.mrq.com",
   cause = "verify",
 }: EntryCodeConfirmationEmailProps) {
   const formattedEndDate = formatActivationEndDate(activationEndsAt);
@@ -248,7 +248,7 @@ export function EntryCodeConfirmationEmail({
                   >
                     The activation runs until {formattedEndDate}.
                   </Text>
-                  <Text
+                  {/* <Text
                     style={{
                       margin: "0 0 4px",
                       fontSize: 14,
@@ -257,8 +257,8 @@ export function EntryCodeConfirmationEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    Need help? Contact us at {supportEmail}.
-                  </Text>
+                    Need help? Contact us at hello@activation.mrq.com.
+                  </Text> */}
                   <Text
                     style={{
                       margin: "0 0 4px",

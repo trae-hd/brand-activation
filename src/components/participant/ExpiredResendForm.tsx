@@ -97,15 +97,15 @@ export function ExpiredResendForm({
         >
           Enter your new code →
         </button>
-        <p className="text-xs text-ink-3">
+        {/* <p className="text-xs text-ink-3">
           Need help?{" "}
           <a
-            href="mailto:hello@mrqlive.com"
+            href="mailto:hello@activation.mrq.com"
             className="underline underline-offset-2"
           >
-            hello@mrqlive.com
+            hello@activation.mrq.com
           </a>
-        </p>
+        </p> */}
       </div>
     );
   }
