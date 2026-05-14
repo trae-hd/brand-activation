@@ -289,22 +289,28 @@ export function EntryCodeConfirmationEmail({
               {/* Heading */}
               <Row>
                 <Column style={{ padding: "24px 32px 8px" }}>
-                  <Text style={{ margin: "0 0 8px", fontSize: 26, lineHeight: "1.2", fontWeight: 700, color: "#1c1917", letterSpacing: "-0.4px", fontFamily: FONT }}>
+                  <Text style={{ margin: 0, fontSize: 26, lineHeight: "1.2", fontWeight: 700, color: "#1c1917", letterSpacing: "-0.4px", fontFamily: FONT }}>
                     {heading}
                   </Text>
-                  {!isResend && showEntryCode && !hasBody && (
-                    <Text style={{ margin: "0 0 16px", fontSize: 15, lineHeight: "1.55", color: "#57534e", fontFamily: FONT }}>
-                      Here&apos;s your entry code:
-                    </Text>
-                  )}
                 </Column>
               </Row>
 
               {/* Body copy — rich text, supports bold/italic */}
               {hasBody && (
                 <Row>
-                  <Column style={{ padding: "0 32px 16px" }}>
+                  <Column style={{ padding: "16px 32px 0" }}>
                     {bodyNodes}
+                  </Column>
+                </Row>
+              )}
+
+              {/* "Here's your entry code:" — always below body, above the block */}
+              {!isResend && showEntryCode && (
+                <Row>
+                  <Column style={{ padding: "16px 32px 0" }}>
+                    <Text style={{ margin: 0, fontSize: 15, lineHeight: "1.55", color: "#57534e", fontFamily: FONT }}>
+                      Here&apos;s your entry code:
+                    </Text>
                   </Column>
                 </Row>
               )}

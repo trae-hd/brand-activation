@@ -406,15 +406,19 @@ function InlineEmailPreview({
           {/* Heading */}
           <div className="px-6 pt-4 pb-2">
             <p className="text-lg font-bold leading-snug tracking-tight">{heading}</p>
-            {showEntryCode && (
-              <p className="mt-1.5 text-xs text-[#57534e]">Here&apos;s your entry code:</p>
-            )}
           </div>
 
           {/* Body copy */}
           {hasBodyContent && (
             <div className="px-6 pb-3">
               {renderContentParagraphs(emailBodyContent, false)}
+            </div>
+          )}
+
+          {/* "Here's your entry code:" — below body, above block */}
+          {showEntryCode && (
+            <div className="px-6 pb-1">
+              <p className="text-xs text-[#57534e]">Here&apos;s your entry code:</p>
             </div>
           )}
 
