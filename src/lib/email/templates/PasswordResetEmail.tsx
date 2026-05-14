@@ -60,7 +60,7 @@ export function PasswordResetEmail({
   return (
     <Html lang="en">
       <Head />
-      <Preview>Reset your MrQ Live password. This link expires in 60 minutes.</Preview>
+      <Preview>Reset your MrQ Activation password. This link expires in 60 minutes.</Preview>
       <Body style={{ margin: 0, padding: 0, backgroundColor: "#f5f4f0", fontFamily: FONT }}>
 
         <Section style={{ padding: "32px 16px" }}>
@@ -105,7 +105,7 @@ export function PasswordResetEmail({
                           lineHeight: "1",
                         }}
                       >
-                        Live
+                        Activation
                       </span>
                     </Column>
                     <Column align="right">
@@ -150,7 +150,7 @@ export function PasswordResetEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    We received a request to reset the password on your MrQ Live account. Click the button below to choose a new one.
+                    We received a request to reset the password on your MrQ Activation account. Click the button below to choose a new one.
                   </Text>
                 </Column>
               </Row>
@@ -334,7 +334,7 @@ export function PasswordResetEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    MrQ Live · Brand activations, in real time
+                    MrQ Activation · Brand activations, in real time
                   </Text>
                   <Text
                     style={{

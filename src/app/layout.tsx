@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MrQ Live Activation",
-  description: "MrQ Live Activation Platform",
+  title: "MrQ Activation",
+  description: "MrQ Activation Platform",
 };
 
 // Explicit viewport — without this, mobile Safari/Chrome can render the page

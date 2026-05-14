@@ -29,7 +29,7 @@ export type WorkspaceSettingsOutput = {
 };
 
 const DEFAULTS: WorkspaceSettingsOutput = {
-  workspaceName: "MrQ Live",
+  workspaceName: "MrQ Activation",
   timezone: "Europe/London",
   otpTtlMin: 10,
   geofence: null,

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { ForgotPasswordForm } from "./_components/ForgotPasswordForm";
 
 export const metadata: Metadata = {
-  title: "Forgot password — MrQ Live Admin",
+  title: "Forgot password — MrQ Activation Admin",
 };
 
 export default function ForgotPasswordPage() {

@@ -70,10 +70,10 @@ export function ParticipantGate({ variant }: ParticipantGateProps) {
         <p className="text-[12px] text-zinc-500">
           Need help?{" "}
           <a
-            href="mailto:hello@mrqlive.com"
+            href="mailto:hello@activation.mrq.com"
             className="text-zinc-300 underline decoration-zinc-700 underline-offset-4 hover:decoration-zinc-400 transition-colors"
           >
-            hello@mrqlive.com
+            hello@activation.mrq.com
           </a>
         </p>
       </footer> */}

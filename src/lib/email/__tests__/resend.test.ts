@@ -17,7 +17,7 @@ vi.mock("@/lib/env", () => ({
   env: {
     NODE_ENV: "test",
     RESEND_API_KEY: "test-resend-key",
-    EMAIL_FROM: "noreply@mrqlive.co.uk",
+    EMAIL_FROM: "noreply@activation.mrq.com",
   },
 }));
 
@@ -33,7 +33,7 @@ const ARGS = {
   entryCode: "MRQ-AB12CD",
   activationName: "Wembley Live Test",
   activationEndsAt: new Date("2026-07-31T17:00:00Z"),
-  supportEmail: "hello@mrqlive.com",
+  supportEmail: "hello@activation.mrq.com",
   cause: "verify" as const,
 };
 
@@ -56,7 +56,7 @@ describe("resendProvider.sendEntryCodeConfirmation", () => {
 
     expect(sendMock).toHaveBeenCalledTimes(1);
     const call = sendMock.mock.calls[0][0];
-    expect(call.from).toBe("noreply@mrqlive.co.uk");
+    expect(call.from).toBe("noreply@activation.mrq.com");
     expect(call.to).toBe(ARGS.to);
     expect(call.subject).toBe("Your entry code for Wembley Live Test");
     expect(call.html).toContain(ARGS.entryCode);
@@ -259,9 +259,9 @@ describe("resendProvider — structured failure shape across all methods", () =>
     const result = await provider.sendInvite({
       to: "newadmin@mrq.com",
       name: "Casey Admin",
-      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=invite&token=abc",
+      setPasswordUrl: "https://activationadmin.mrq.com/auth/set-password?type=invite&token=abc",
       issuerName: "Trae",
-      workspaceName: "MrQ Live",
+      workspaceName: "MrQ Activation",
       role: "ADMIN",
     });
 
@@ -282,7 +282,7 @@ describe("resendProvider — structured failure shape across all methods", () =>
     const provider = await loadProvider();
     const result = await provider.sendPasswordReset({
       to: "trae@mrq.com",
-      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=reset&token=xyz",
+      setPasswordUrl: "https://activationadmin.mrq.com/auth/set-password?type=reset&token=xyz",
     });
 
     expect(sendMock).toHaveBeenCalledTimes(1);
@@ -311,9 +311,9 @@ describe("resendProvider — structured failure shape across all methods", () =>
     const result = await provider.sendInvite({
       to: "newadmin@mrq.com",
       name: "Casey Admin",
-      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=invite&token=abc",
+      setPasswordUrl: "https://activationadmin.mrq.com/auth/set-password?type=invite&token=abc",
       issuerName: "Trae",
-      workspaceName: "MrQ Live",
+      workspaceName: "MrQ Activation",
       role: "MEMBER",
     });
 
@@ -326,7 +326,7 @@ describe("resendProvider — structured failure shape across all methods", () =>
     const provider = await loadProvider();
     const result = await provider.sendPasswordReset({
       to: "trae@mrq.com",
-      setPasswordUrl: "https://admin.mrqlive.co.uk/auth/set-password?type=reset&token=xyz",
+      setPasswordUrl: "https://activationadmin.mrq.com/auth/set-password?type=reset&token=xyz",
     });
 
     expect(result).toEqual({ ok: true, messageId: "msg_reset_ok" });

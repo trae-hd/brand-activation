@@ -8,8 +8,8 @@ import { SidebarBadgeFetcher } from "@/components/shared/SidebarBadgeFetcher";
 import type { AdminRole } from "@prisma/client";
 
 export const metadata: Metadata = {
-  title: "MrQ Live — Admin",
-  description: "MrQ Live Activation Admin Console",
+  title: "MrQ Activation — Admin",
+  description: "MrQ Activation Admin Console",
 };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

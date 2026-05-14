@@ -33,7 +33,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
   return (
     <Html lang="en">
       <Head />
-      <Preview>Your MrQ Live verification code is {otp}. Expires in 10 minutes.</Preview>
+      <Preview>Your MrQ Activation verification code is {otp}. Expires in 10 minutes.</Preview>
       <Body
         style={{ margin: 0, padding: 0, backgroundColor: "#f5f4f0", fontFamily: FONT }}
       >
@@ -79,7 +79,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                           lineHeight: "1",
                         }}
                       >
-                        Live
+                        Activation
                       </span>
                     </Column>
                     <Column align="right">
@@ -124,7 +124,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                       fontFamily: FONT,
                     }}
                   >
-                    Enter this code in MrQ Live to finish signing in. It works once and
+                    Enter this code in MrQ Activation to finish signing in. It works once and
                     expires shortly.
                   </Text>
                 </Column>
@@ -224,7 +224,7 @@ export function OtpEmail({ otp = "482619", to = "you@example.com" }: OtpEmailPro
                       fontFamily: FONT,
                     }}
                   >
-                    MrQ Live · Brand activations, in real time
+                    MrQ Activation · Brand activations, in real time
                   </Text>
                   <Text
                     style={{

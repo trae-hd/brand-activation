@@ -129,9 +129,9 @@ export const resendProvider: EmailProvider = {
   sendOtp: async ({ to, otp }) => {
     const formatted = otp.replace(/\s/g, "").replace(/^(\d{3})(\d{3})$/, "$1 $2");
     const html = await render(React.createElement(OtpEmail, { otp, to }));
-    const text = `Your MrQ Live verification code is ${formatted}.\n\nIt expires in 10 minutes. We will never ask for this code over email, chat or phone.\n\nIf you didn't try to sign in, you can safely ignore this email.`;
+    const text = `Your MrQ Activation verification code is ${formatted}.\n\nIt expires in 10 minutes. We will never ask for this code over email, chat or phone.\n\nIf you didn't try to sign in, you can safely ignore this email.`;
     return toProviderResult(
-      await sendWithRetry({ to, subject: `Your MrQ Live code: ${formatted}`, html, text }),
+      await sendWithRetry({ to, subject: `Your MrQ Activation code: ${formatted}`, html, text }),
     );
   },
 
@@ -154,7 +154,7 @@ export const resendProvider: EmailProvider = {
         expiresAt,
       }),
     );
-    const text = `Hi ${name},\n\n${issuerName} invited you to join ${workspaceName} on MrQ Live as ${roleLabel}.\n\nSet your password here:\n${setPasswordUrl}\n\nThis link expires in 1 hour. If you weren't expecting this invitation, you can ignore this email — no account is created until you accept.`;
+    const text = `Hi ${name},\n\n${issuerName} invited you to join ${workspaceName} on MrQ Activation as ${roleLabel}.\n\nSet your password here:\n${setPasswordUrl}\n\nThis link expires in 1 hour. If you weren't expecting this invitation, you can ignore this email — no account is created until you accept.`;
     return toProviderResult(
       await sendWithRetry({ to, subject: `${issuerName} invited you to ${workspaceName}`, html, text }),
     );
@@ -168,9 +168,9 @@ export const resendProvider: EmailProvider = {
     const html = await render(
       React.createElement(PasswordResetEmail, { setPasswordUrl, to, sentAt, expiresAt }),
     );
-    const text = `We received a request to reset the password for your MrQ Live account.\n\nChoose a new password here:\n${setPasswordUrl}\n\nThis link expires in 60 minutes. If you didn't request this, you can ignore this email — your password won't change.`;
+    const text = `We received a request to reset the password for your MrQ Activation account.\n\nChoose a new password here:\n${setPasswordUrl}\n\nThis link expires in 60 minutes. If you didn't request this, you can ignore this email — your password won't change.`;
     return toProviderResult(
-      await sendWithRetry({ to, subject: "Reset your MrQ Live password", html, text }),
+      await sendWithRetry({ to, subject: "Reset your MrQ Activation password", html, text }),
     );
   },
 

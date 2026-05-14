@@ -29,7 +29,7 @@ function buildDescription(
     body,
   ];
   if (attachContext) {
-    lines.push("", `---`, `**Submitted by:** ${actorEmail}`, `**Source:** MrQ Live admin panel`);
+    lines.push("", `---`, `**Submitted by:** ${actorEmail}`, `**Source:** MrQ Activation admin panel`);
   }
   return lines.join("\n");
 }

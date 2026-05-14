@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import { SignInForm } from "./_components/SignInForm";
 
 export const metadata: Metadata = {
-  title: "Sign in — MrQ Live Admin",
+  title: "Sign in — MrQ Activation Admin",
 };
 
 interface SignInPageProps {

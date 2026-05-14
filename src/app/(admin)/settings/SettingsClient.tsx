@@ -340,7 +340,7 @@ export function SettingsClient({ role }: { role: "ADMIN" | "MEMBER" }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground">MrQ Live · workspace</p>
+        <p className="text-sm text-muted-foreground">MrQ Activation · workspace</p>
       </div>
 
       <Tabs defaultValue="profile">

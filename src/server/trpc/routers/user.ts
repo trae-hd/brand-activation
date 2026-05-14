@@ -221,7 +221,7 @@ export const userRouter = router({
         name: input.name,
         setPasswordUrl,
         issuerName: actor.name,
-        workspaceName: "MrQ Live",
+        workspaceName: "MrQ Activation",
         role: input.role,
       });
 

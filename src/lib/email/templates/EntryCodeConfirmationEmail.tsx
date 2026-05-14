@@ -68,7 +68,7 @@ export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
     ``,
     // `Need help? Contact us at ${supportEmail}.`,
     ``,
-    `— The MrQ Live team`,
+    `— The MrQ Activation team`,
   ].join("\n");
 }
 
@@ -294,7 +294,7 @@ export function EntryCodeConfirmationEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    — The MrQ Live team
+                    — The MrQ Activation team
                   </Text>
                   <Text
                     style={{

@@ -20,8 +20,8 @@ vi.mock("@/lib/env", () => ({
     NODE_ENV: "test",
     IP_HMAC_KEY: "test-ip-key-dddddddddddddddddddddddddddddddd",
     EMAIL_HASH_HMAC_KEY: "test-email-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    EMAIL_FROM: "noreply@mrqlive.co.uk",
-    SUPPORT_EMAIL: "hello@mrqlive.com",
+    EMAIL_FROM: "noreply@activation.mrq.com",
+    SUPPORT_EMAIL: "hello@activation.mrq.com",
   },
 }));
 
@@ -134,7 +134,7 @@ describe("/api/resend-confirmation-email", () => {
     expect(sendArgs.to).toBe(VERIFIED_REG.email);
     expect(sendArgs.entryCode).toBe(VERIFIED_REG.entryCode);
     expect(sendArgs.activationName).toBe("Wembley Live Test");
-    expect(sendArgs.supportEmail).toBe("hello@mrqlive.com");
+    expect(sendArgs.supportEmail).toBe("hello@activation.mrq.com");
     expect(sendArgs.cause).toBe("resend");
 
     // Timestamp updated.

@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/env", () => ({
   env: {
     NODE_ENV: "test",
-    PUBLIC_BASE_URL: "https://mrqlive.co.uk",
+    PUBLIC_BASE_URL: "https://activation.mrq.com",
     INVITE_TOKEN_HMAC_KEY: "test-invite-key-aaaaaaaaaaaaaaaaaaaaaaaaaaa",
     RESET_TOKEN_HMAC_KEY: "test-reset-key-bbbbbbbbbbbbbbbbbbbbbbbbbbb",
   },
@@ -84,7 +84,7 @@ describe("activation.getCampaignQrPng", () => {
     expect(result.filename).toBe("boxing-2026.png");
     // The mock renders Buffer.from(url) — decode and check it matches getActivationUrl output
     const encoded = Buffer.from(result.base64, "base64").toString("utf8");
-    expect(encoded).toBe("https://mrqlive.co.uk/boxing-2026");
+    expect(encoded).toBe("https://activation.mrq.com/boxing-2026");
   });
 
   it("URL matches getActivationUrl with all UTM params", async () => {
@@ -99,7 +99,7 @@ describe("activation.getCampaignQrPng", () => {
 
     const encoded = Buffer.from(result.base64, "base64").toString("utf8");
     const parsed = new URL(encoded);
-    expect(parsed.hostname).toBe("mrqlive.co.uk");
+    expect(parsed.hostname).toBe("activation.mrq.com");
     expect(parsed.pathname).toBe("/boxing-2026");
     expect(parsed.searchParams.get("utm_source")).toBe("email");
     expect(parsed.searchParams.get("utm_medium")).toBe("newsletter");

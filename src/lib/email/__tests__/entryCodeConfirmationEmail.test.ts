@@ -16,7 +16,7 @@ const PROPS = {
   // DST handling, not just UTC fall-through. 2026-07-31T17:00:00Z is 18:00
   // local in London (BST = UTC+1).
   activationEndsAt: new Date("2026-07-31T17:00:00Z"),
-  supportEmail: "hello@mrqlive.com",
+  supportEmail: "hello@activation.mrq.com",
   cause: "verify" as const,
 };
 
@@ -50,10 +50,9 @@ describe("EntryCodeConfirmationEmail", () => {
     expect(lines).toContain(PROPS.entryCode);
   });
 
-  it("plaintext directs the recipient to the support email and warns the inbox is unmonitored", () => {
+  it("plaintext contains the MrQ Activation team sign-off", () => {
     const text = plainTextFor(PROPS);
-    expect(text).toContain("Contact us at hello@mrqlive.com");
-    expect(text.toLowerCase()).toContain("not monitored");
+    expect(text).toContain("— The MrQ Activation team");
   });
 
   it("cause: 'verify' renders the initial-confirmation headline (HTML + plaintext)", async () => {

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { SetPasswordForm } from "./_components/SetPasswordForm";
 
 export const metadata: Metadata = {
-  title: "Set password — MrQ Live Admin",
+  title: "Set password — MrQ Activation Admin",
 };
 
 export default async function SetPasswordPage({

@@ -52,7 +52,7 @@ const PREVIEW_DEFAULTS: InviteEmailProps = {
   name: "Jordan",
   setPasswordUrl: "#",
   issuerName: "Priya Shah",
-  workspaceName: "MrQ Live",
+  workspaceName: "MrQ Activation",
   role: "ADMIN",
   sentAt: new Date("2026-01-01T12:00:00.000Z"),
   expiresAt: new Date("2026-01-01T13:00:00.000Z"),
@@ -146,7 +146,7 @@ export function InviteEmail({
                           lineHeight: "1",
                         }}
                       >
-                        Live
+                        Activation
                       </span>
                     </Column>
                     <Column align="right">
@@ -249,7 +249,7 @@ export function InviteEmail({
                   >
                     {issuerName} invited you to{" "}
                     <strong style={{ color: "#1c1917", fontWeight: 600 }}>{workspaceName}</strong>{" "}
-                    on MrQ Live as{" "}
+                    on MrQ Activation as{" "}
                     <strong style={{ color: "#1c1917", fontWeight: 600 }}>
                       {role === "ADMIN" ? "an Administrator" : "a Member"}
                     </strong>
@@ -490,7 +490,7 @@ export function InviteEmail({
                       fontFamily: FONT,
                     }}
                   >
-                    MrQ Live · Brand activations, in real time
+                    MrQ Activation · Brand activations, in real time
                   </Text>
                   <Text
                     style={{

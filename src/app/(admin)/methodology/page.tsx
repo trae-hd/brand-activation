@@ -92,7 +92,7 @@ export default function MethodologyPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Methodology</h1>
           <p className="mt-2 text-muted-foreground text-sm">
-            How the MrQ Live Activation Platform works — from creating an event through to reading
+            How the MrQ Activation Platform works — from creating an event through to reading
             the final numbers.
           </p>
         </div>
@@ -117,7 +117,7 @@ export default function MethodologyPage() {
           {/* 1 */}
           <Section id="overview" title="1. Overview & terminology">
             <p>
-              The MrQ Live Activation Platform lets the operations team run in-venue promotional
+              The MrQ Activation Platform lets the operations team run in-venue promotional
               sign-up events — boxing nights, sports broadcasts, fan experiences — and capture
               verified email registrations from participants. Every registration is double-confirmed
               via a one-time-passcode (OTP) sent to the participant&apos;s inbox before it counts.

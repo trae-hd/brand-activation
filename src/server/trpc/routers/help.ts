@@ -36,7 +36,7 @@ export const helpRouter = router({
           "---",
           `**Submitted by:** ${actorName} (${actorEmail})`,
           `**Priority:** ${input.priority}`,
-          `**Source:** MrQ Live admin panel`,
+          `**Source:** MrQ Activation admin panel`,
         ].join("\n");
 
         const result = await createLinearIssue(env.LINEAR_API_KEY, {

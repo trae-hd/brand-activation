@@ -27,7 +27,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
     : null;
 
   return (
-    <PagesLayout appName="MrQ Live · Admin" navItems={navMain} user={user}>
+    <PagesLayout appName="MrQ Activation · Admin" navItems={navMain} user={user}>
       {children}
     </PagesLayout>
   );

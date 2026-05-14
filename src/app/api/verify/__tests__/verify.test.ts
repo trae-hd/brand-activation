@@ -15,8 +15,8 @@ vi.mock("@/lib/env", () => ({
     IP_HMAC_KEY: "test-ip-key-dddddddddddddddddddddddddddddddd",
     EMAIL_HASH_HMAC_KEY: "test-email-key-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     PENDING_TOKEN_SECRET: "test-pending-secret-eeeeeeeeeeeeeeeeeeeeeeeeee",
-    EMAIL_FROM: "noreply@mrqlive.co.uk",
-    SUPPORT_EMAIL: "hello@mrqlive.com",
+    EMAIL_FROM: "noreply@activation.mrq.com",
+    SUPPORT_EMAIL: "hello@activation.mrq.com",
   },
 }));
 
@@ -260,7 +260,7 @@ describe("/api/verify — post-verify audit + email", () => {
     const sendArgs = mockSendEntryCodeConfirmation.mock.calls[0][0];
     expect(sendArgs.to).toBe("punter@example.com");
     expect(sendArgs.activationName).toBe("Wembley Live Test");
-    expect(sendArgs.supportEmail).toBe("hello@mrqlive.com");
+    expect(sendArgs.supportEmail).toBe("hello@activation.mrq.com");
     expect(sendArgs.activationEndsAt).toEqual(new Date("2026-07-31T17:00:00Z"));
     expect(typeof sendArgs.entryCode).toBe("string");
     expect(sendArgs.cause).toBe("verify");

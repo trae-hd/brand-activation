@@ -56,7 +56,7 @@ export function SignInForm({ callbackUrl }: SignInFormProps) {
         <div className="text-center">
           <div className="text-3xl font-bold tracking-tight">HQ</div>
           <div className="text-muted-foreground text-xs font-medium">
-            MrQ Live · Admin
+            MrQ Activation · Admin
           </div>
         </div>
 
