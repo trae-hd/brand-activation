@@ -47,6 +47,11 @@ export function proxy(req: NextRequest) {
     return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
+  // Email preview is reachable only on the admin host.
+  if (path.startsWith("/api/email-preview/")) {
+    return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
+  }
+
   // Participant Route Handlers are reachable only on the participant host.
   if (
     path === "/api/register" ||
