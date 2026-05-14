@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { env } from "@/lib/env";
 
 type Payload =
@@ -15,7 +15,13 @@ export function verifyPendingToken(token: string): Payload | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
   const expected = createHmac("sha256", env.PENDING_TOKEN_SECRET).update(body).digest("base64url");
-  if (expected !== sig) return null;
+  try {
+    const a = Buffer.from(expected, "base64url");
+    const b = Buffer.from(sig, "base64url");
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  } catch {
+    return null;
+  }
   try {
     return JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as Payload;
   } catch {

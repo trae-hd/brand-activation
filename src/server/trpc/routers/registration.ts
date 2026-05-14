@@ -289,8 +289,8 @@ export const registrationRouter = router({
         select: { id: true },
       });
 
-      // Stamp mrqEnrichedAt so the UI reflects the check was requested.
       // TODO: replace with real MRQ account API call (hash email → lookup → update status + mrqLastLoginAt).
+      // Until then, only stamp mrqEnrichedAt so the UI reflects the check was requested.
       await prisma.registration.updateMany({
         where: { activationId: input.activationId, status: "VERIFIED" },
         data: { mrqEnrichedAt: new Date() },
@@ -298,11 +298,11 @@ export const registrationRouter = router({
 
       await writeAuditLog({
         category: "ADMIN",
-        action: "registration.mrq_enrich",
+        action: "registration.mrq_enrich_requested",
         actorId,
         targetType: "Activation",
         targetId: input.activationId,
-        metadata: { count: verified.length },
+        metadata: { count: verified.length, note: "stub — no external API call made" },
       });
 
       return { enriched: verified.length };

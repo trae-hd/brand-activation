@@ -20,5 +20,6 @@ export const hmac = {
   /** Email is lowercased before hashing — case-insensitive dedup invariant. */
   email: (raw: string) => make(env.EMAIL_HASH_HMAC_KEY)(raw.toLowerCase()),
   ip: make(env.IP_HMAC_KEY),
+  userAgent: make(env.USER_AGENT_HMAC_KEY),
   otp: make(env.OTP_HMAC_KEY),
 } as const;

@@ -34,6 +34,7 @@ const schema = z.object({
   // Crypto keys — min 32 chars (256-bit hex or base64url)
   EMAIL_HASH_HMAC_KEY: z.string().min(32),
   IP_HMAC_KEY: z.string().min(32),
+  USER_AGENT_HMAC_KEY: z.string().min(32),
   OTP_HMAC_KEY: z.string().min(32),
   PENDING_TOKEN_SECRET: z.string().min(32),
   INVITE_TOKEN_HMAC_KEY: z.string().min(32),

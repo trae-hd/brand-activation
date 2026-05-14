@@ -136,7 +136,15 @@ export default async function LandingPage({
   const activation = await getActivation(activationSlug);
   if (!activation) notFound();
 
-  if (activation.status === "ENDED" && !isPreview) redirect(`/${activationSlug}/ended`);
+  if (activation.status === "ENDED") {
+    if (!isPreview) redirect(`/${activationSlug}/ended`);
+    // Previewing an ended activation requires the same gate as a draft preview.
+    const tokenValid = sp.pt ? verifyPreviewToken(activation.id, sp.pt) : false;
+    if (!tokenValid) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.adminUserId) redirect(`/${activationSlug}/ended`);
+    }
+  }
   if (activation.status === "DRAFT") {
     if (!isPreview) notFound();
     const tokenValid = sp.pt ? verifyPreviewToken(activation.id, sp.pt) : false;
@@ -194,6 +202,9 @@ export default async function LandingPage({
             alt={activation.heroImageAlt ?? ""}
             fill
             className="object-cover"
+            // heroImageUrl is stored as a base64 data URL — Next.js optimisation
+            // requires an external URL + remotePatterns. Until images are migrated
+            // to a CDN (upload → hosted URL), this must stay unoptimized.
             unoptimized
           />
         </div>

@@ -9,12 +9,11 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const session = await getServerSession(authOptions);
-  if (
-    !session?.user?.adminUserId ||
-    !session.user.active ||
-    session.user.role !== "ADMIN"
-  ) {
+  if (!session?.user?.adminUserId || !session.user.active) {
     return new NextResponse(null, { status: 401 });
+  }
+  if (session.user.role !== "ADMIN") {
+    return new NextResponse(null, { status: 403 });
   }
 
   const { id } = await ctx.params;

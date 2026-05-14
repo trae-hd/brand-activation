@@ -6,6 +6,13 @@ import { redis } from "@/lib/redis/client";
  * between them, the key has no TTL and the limit becomes permanent.
  *
  * Returns true if the request is within the limit, false if it exceeds it.
+ *
+ * Edge case: EXPIRE is only set when current == 1 (first increment). If a
+ * key from a previous window survived a Redis restart without a TTL, or was
+ * written by a different caller with a different windowSeconds, the TTL will
+ * not be refreshed and the window may never expire. This is acceptable given
+ * that keys are keyed per-window use case and Redis restarts are infrequent,
+ * but callers must use consistent windowSeconds for a given key pattern.
  */
 const SCRIPT = `
   local current = redis.call('INCR', KEYS[1])

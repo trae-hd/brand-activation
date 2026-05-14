@@ -61,6 +61,9 @@ export const settingsRouter = router({
     .input(UpdateSettingsSchema)
     .mutation(async ({ input, ctx }): Promise<WorkspaceSettingsOutput> => {
       const actorId = ctx.session.user.adminUserId!;
+      // TODO: wire otpTtlMin into issueOtp() and sessionTimeoutHours into
+      // authOptions.session.maxAge. Both are persisted here but not yet read
+      // at the enforcement site — changes to these fields have no runtime effect.
       const updated = await prisma.workspaceSettings.upsert({
         where: { id: "workspace" },
         create: { id: "workspace", ...input, updatedById: actorId },

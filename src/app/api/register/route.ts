@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
     const userAgent = req.headers.get("user-agent") ?? "";
     const ipHash = hmac.ip(ip);
-    const userAgentHash = hmac.ip(userAgent);
+    const userAgentHash = hmac.userAgent(userAgent);
     const emailHash = hmac.email(email);
 
     const ipOk = await fixedWindow({ key: `rl:ip:register:${ipHash}`, limit: 30, windowSeconds: 60 });

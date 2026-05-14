@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, publicProcedure } from "../init";
+import { router } from "../init";
 import { memberProcedure, adminProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { mintRawToken, hashToken } from "@/lib/auth/tokens";
@@ -215,7 +215,7 @@ export const userRouter = router({
         });
       });
 
-      const setPasswordUrl = `${env.NEXTAUTH_URL}/auth/set-password?type=invite&token=${rawToken!}`;
+      const setPasswordUrl = `${env.ADMIN_HOST}/auth/set-password?type=invite&token=${rawToken!}`;
       const sendResult = await emailProvider.sendInvite({
         to: input.email,
         name: input.name,
@@ -361,7 +361,7 @@ export const userRouter = router({
         data: { tokenHash, subjectId: target.id, issuerId: actorId, expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
         select: { id: true },
       });
-      const setPasswordUrl = `${env.NEXTAUTH_URL}/auth/set-password?type=reset&token=${raw}`;
+      const setPasswordUrl = `${env.ADMIN_HOST}/auth/set-password?type=reset&token=${raw}`;
       const sendResult = await emailProvider.sendPasswordReset({ to: target.email, setPasswordUrl });
       if (!sendResult.ok) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send reset email. Please try again." });

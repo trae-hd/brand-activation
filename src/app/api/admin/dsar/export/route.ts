@@ -16,12 +16,11 @@ const Body = z.object({
 // POST — email travels in the request body, never in the URL (PII compliance).
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  if (
-    !session?.user?.adminUserId ||
-    !session.user.active ||
-    session.user.role !== "ADMIN"
-  ) {
+  if (!session?.user?.adminUserId || !session.user.active) {
     return new NextResponse(null, { status: 401 });
+  }
+  if (session.user.role !== "ADMIN") {
+    return new NextResponse(null, { status: 403 });
   }
 
   const body = await req.json().catch(() => null);

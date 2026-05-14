@@ -8,37 +8,30 @@ import { ERASURE_REQUIRED_PHRASE } from "@/lib/compliance/constants";
 
 const emailSchema = z.string().email().transform((s) => s.toLowerCase());
 
+async function previewRegistrationsForEmail(email: string) {
+  const rows = await prisma.registration.findMany({
+    where: { email },
+    select: { activation: { select: { name: true } } },
+  });
+  return {
+    rowCount: rows.length,
+    activationNames: [...new Set(rows.map((r) => r.activation.name))],
+  };
+}
+
 export const complianceRouter = router({
   dsar: router({
     /** Returns the count and activation names for a given email — read-only preview. */
     preview: adminProcedure
       .input(z.object({ email: emailSchema }))
-      .query(async ({ input }) => {
-        const rows = await prisma.registration.findMany({
-          where: { email: input.email },
-          select: { activation: { select: { name: true } } },
-        });
-        return {
-          rowCount: rows.length,
-          activationNames: [...new Set(rows.map((r) => r.activation.name))],
-        };
-      }),
+      .query(async ({ input }) => previewRegistrationsForEmail(input.email)),
   }),
 
   erasure: router({
     /** Returns count + activation names — read-only, no side effects. */
     preview: adminProcedure
       .input(z.object({ email: emailSchema }))
-      .query(async ({ input }) => {
-        const rows = await prisma.registration.findMany({
-          where: { email: input.email },
-          select: { activation: { select: { name: true } } },
-        });
-        return {
-          rowCount: rows.length,
-          activationNames: [...new Set(rows.map((r) => r.activation.name))],
-        };
-      }),
+      .query(async ({ input }) => previewRegistrationsForEmail(input.email)),
 
     /**
      * Fulfil a right-to-erasure request. Typed phrase is validated server-side

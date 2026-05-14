@@ -1,6 +1,6 @@
 # MrQ Live — Future Features & Improvements
 
-**Last reviewed:** 2026-05-10
+**Last reviewed:** 2026-05-14
 **Maintained alongside:** [`INVARIANTS.md`](./INVARIANTS.md) (must-not-change rules) · [`/methodology`](../app/(admin)/methodology/page.tsx) (how things work today)
 
 ---
@@ -189,6 +189,55 @@ This is the canonical backlog of **deferred work, known limitations, and discuss
 - **Status:** 5 tests in `src/lib/otp/__tests__/issue-verify.test.ts` require a real Redis instance. Mocked Prisma tests pass; these don't.
 - **Priority / effort:** P3 / S
 - **Sketch:** Either (a) wrap the suite with `describe.skipIf(!process.env.REDIS_URL)` so they only run when a test Redis is available, or (b) adopt `ioredis-mock` for the suite. Option (b) is preferred — keeps CI green by default.
+
+### 5.6 · Migrate image storage from base64 DB columns to a CDN
+- **Status:** Active limitation. Both `Activation.heroImageUrl` and `Activation.successSponsorLogoUrl` store raw base64 data URLs produced by the browser's `FileReader.readAsDataURL()` API. This was the simplest path to get images working without an upload service, but it has real costs at scale.
+- **Priority / effort:** P2 / M
+- **Discovered:** 2026-05-14 during codebase security + quality review.
+
+**Why it matters:**
+
+1. **DB bloat.** A 100 KB PNG encodes to ~135 KB of base64. Each activation record that has both images carries ~270 KB of image data inline. Every query that selects either column — including review diffs, approval snapshots, and the participant landing/success page cache — pulls this payload over the wire.
+2. **No server-side size guard.** `src/lib/upload/validateImage.ts` enforces file size client-side only. A direct `trpc.activation.create` call with an arbitrarily large data URL bypasses the check and writes it to the DB. The `ActivationWriteSchema` has `heroImageUrl: z.string().optional().nullable()` with no `max()`.
+3. **No image optimisation.** Both `<Image>` usages carry `unoptimized` (see `src/app/(participant)/[activationSlug]/page.tsx` and `src/app/(participant)/[activationSlug]/success/page.tsx`) because Next.js optimisation only works with external URLs. Data URLs don't benefit from WebP conversion, responsive resizing, or CDN edge caching. On event Wi-Fi with many concurrent visitors, this is a meaningful load-time penalty.
+4. **Data URL length in query strings / headers.** If a base64 image URL ever leaks into a URL or a request header (e.g. an improperly placed `?imageUrl=...` param), it will cause 414/431 errors and obscure debugging.
+
+**Migration plan (three phases, can ship independently):**
+
+**Phase A — Upload endpoint + CDN storage (prerequisite for everything else)**
+- Add a `POST /api/admin/upload` route (ADMIN session required). Accepts a `multipart/form-data` with a single image file.
+- Server-side: re-validate file type (MIME sniffing, not just extension) and size against the same limits as the client. Reject anything over the cap.
+- Upload the validated buffer to Cloudflare R2 (recommended — already on Railway stack; no egress fees; pairs naturally with Cloudflare Images for optimisation) or AWS S3 + CloudFront.
+- Return `{ url: "https://..." }` — a permanent, public CDN URL.
+- Wire the upload route into `ActivationFormHeroImage` (`src/components/admin/activation-form/ActivationFormHeroImage.tsx`): replace `reader.readAsDataURL()` → `fetch('/api/admin/upload', { body: formData })`, then call `onChange(url)` with the CDN URL instead of the data URL.
+- Add `z.string().url().max(2048)` validation to `heroImageUrl` and `successSponsorLogoUrl` in `ActivationWriteSchema` once the upload route is live. The current `z.string()` without `.url()` is necessary only because data URLs start with `data:`, not `https:`.
+- Add `remotePatterns` for the CDN host to `next.config.ts` and remove `unoptimized` from both `<Image>` usages.
+
+**Phase B — Backfill existing rows**
+- One-off migration script: iterate all `Activation` rows where `heroImageUrl` or `successSponsorLogoUrl` starts with `data:`, decode the base64 payload, upload to CDN via the same bucket, update the DB column to the CDN URL.
+- Script should be idempotent (can be re-run safely) and run outside a DB transaction (stream one row at a time; `UPDATE` after each successful CDN upload so a crash mid-run doesn't lose progress).
+- Wrap the upload calls in a retry (3 attempts, exponential backoff) — CDN APIs occasionally return transient 5xx.
+- Log a summary: rows processed, rows updated, rows skipped (already a URL), rows failed.
+
+**Phase C — Add server-side size enforcement**
+- Once the upload route is in place and the `z.string().url()` constraint is added to the schema, the "max size bypass via direct API" path is closed — the route enforces it before the URL is ever generated.
+- Add a test in the new upload route's test file that posts a file exceeding the size limit and asserts 413.
+
+**Recommended CDN:** Cloudflare R2 + Cloudflare Images. Zero egress fees, built-in image transformation (replaces Next.js optimisation for CDN-hosted images), and the team is likely already on Cloudflare given the Railway + custom-domain setup.
+
+**New env vars needed:** `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `CDN_BASE_URL`. Add these to `src/lib/env.ts` as optional (`z.string().optional()`) with a guard at the upload route: if any are absent, return 501 Not Implemented so development without storage credentials fails gracefully.
+
+**Files affected:**
+- `prisma/schema.prisma` — no schema change needed; columns stay as `String?`
+- `src/lib/env.ts` — add optional R2/CDN vars
+- `src/app/api/admin/upload/route.ts` — new upload endpoint
+- `src/lib/upload/validateImage.ts` — extend for server-side use (currently browser-only via `URL.createObjectURL`)
+- `src/components/admin/activation-form/ActivationFormHeroImage.tsx` — replace `readAsDataURL` with upload-then-URL
+- `src/server/trpc/routers/activation.ts` — tighten `heroImageUrl` and `successSponsorLogoUrl` schema from `z.string()` to `z.string().url().max(2048)`
+- `src/app/(participant)/[activationSlug]/page.tsx` — remove `unoptimized` from hero `<Image>`
+- `src/app/(participant)/[activationSlug]/success/page.tsx` — remove `unoptimized` from sponsor logo `<Image>`
+- `next.config.ts` — add `images.remotePatterns` for CDN host
+- `scripts/backfill-images-to-cdn.ts` — new one-off migration script (Phase B)
 
 ---
 

@@ -110,10 +110,23 @@ export async function POST(req: Request) {
           break;
         } catch {
           if (attempt === 2) {
-            // Give up on code generation — still mark verified without a code.
+            // All 3 candidates collided — mark verified without a code and
+            // surface an alert so the team can investigate and issue one manually.
+            console.error(
+              "[verify] entry-code generation exhausted 3 attempts",
+              { registrationId: decoded.registrationId },
+            );
             await prisma.registration.update({
               where: { id: decoded.registrationId },
               data: { status: "VERIFIED", verifiedAt: new Date() },
+            });
+            await writeAuditLog({
+              category: "ADMIN",
+              action: "participant.entry_code_generation_failed",
+              targetType: "Registration",
+              targetId: decoded.registrationId,
+              metadata: { attempts: 3, prefix: activation?.entryCodePrefix ?? null },
+              ipHash,
             });
           }
         }

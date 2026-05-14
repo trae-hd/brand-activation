@@ -560,6 +560,14 @@ export const activationRouter = router({
     .mutation(async ({ input, ctx }): Promise<{ ok: true }> => {
       const actorId = ctx.session.user.adminUserId!;
 
+      // Bypassing time-based guards is an ADMIN-only action.
+      if (input.force && ctx.adminUser.role !== "ADMIN") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only ADMINs can force a status transition.",
+        });
+      }
+
       const activation = await prisma.activation.findUnique({
         where: { id: input.activationId },
         select: { id: true, status: true, startsAt: true, endsAt: true, reviewStatus: true },
@@ -845,14 +853,23 @@ export const activationRouter = router({
       const actorId = ctx.session.user.adminUserId!;
       const activation = await prisma.activation.findUnique({
         where: { id: input.activationId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
       if (!activation) throw new TRPCError({ code: "NOT_FOUND" });
+      if (activation.status === "LIVE") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot archive a LIVE activation. End it first.",
+        });
+      }
       const archivedAt = new Date();
       await prisma.$transaction(async (tx) => {
+        // Only set archivedAt — do not overwrite endsAt. For ENDED activations
+        // endsAt is already in the past; overwriting it would make unarchival
+        // unable to restore the original end date without a schema change.
         await tx.activation.update({
           where: { id: input.activationId },
-          data: { archivedAt, endsAt: archivedAt },
+          data: { archivedAt },
         });
         await writeAuditLog({
           category: "ADMIN",
