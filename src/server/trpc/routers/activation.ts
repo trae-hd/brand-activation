@@ -915,6 +915,7 @@ export const activationRouter = router({
       where: {
         reviewStatus: "SUBMITTED",
         createdById: { not: userId },
+        archivedAt: null,
       },
     });
   }),
