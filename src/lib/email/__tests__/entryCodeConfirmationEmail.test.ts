@@ -21,9 +21,15 @@ const PROPS = {
 };
 
 describe("EntryCodeConfirmationEmail", () => {
-  it("subject includes the activation name", () => {
-    expect(subjectFor(PROPS.activationName)).toBe(
+  it("subject includes the activation name when an entry code is supplied", () => {
+    expect(subjectFor(PROPS.activationName, PROPS.entryCode)).toBe(
       "Your entry code for Wembley Live Test",
+    );
+  });
+
+  it("subject falls back to a generic registration line when no entry code exists", () => {
+    expect(subjectFor(PROPS.activationName, null)).toBe(
+      "You're registered for Wembley Live Test",
     );
   });
 

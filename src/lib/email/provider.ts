@@ -50,7 +50,9 @@ export interface EmailProvider {
   }): Promise<EmailSendSuccess | EmailSendFailure>;
   sendEntryCodeConfirmation(args: {
     to: string;
-    entryCode: string;
+    /** Null when the activation has no `entryCodePrefix` — the email still
+     * sends but the code block is omitted and the subject/heading adjust. */
+    entryCode: string | null;
     activationName: string;
     activationEndsAt: Date;
     supportEmail: string;

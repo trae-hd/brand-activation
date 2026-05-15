@@ -212,7 +212,7 @@ export const resendProvider: EmailProvider = {
     };
     const html = await render(React.createElement(EntryCodeConfirmationEmail, props));
     const text = entryCodeConfirmationText(props);
-    const subject = emailSubject?.trim() || entryCodeConfirmationSubject(activationName);
+    const subject = emailSubject?.trim() || entryCodeConfirmationSubject(activationName, entryCode);
     return toProviderResult(await sendWithRetry({ to, subject, html, text }));
   },
 };

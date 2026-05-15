@@ -129,7 +129,10 @@ function hasDocContent(doc: unknown): boolean {
 
 export interface EntryCodeConfirmationEmailProps {
   to: string;
-  entryCode: string;
+  /** Null when the activation has no `entryCodePrefix` — the email renders
+   * without the code block and subject/heading shift to a generic
+   * "you're registered" confirmation. */
+  entryCode: string | null;
   activationName: string;
   activationEndsAt: Date;
   supportEmail: string;
@@ -163,8 +166,10 @@ export function formatActivationEndDate(d: Date): string {
   return END_DATE_FORMATTER.format(d);
 }
 
-export function subjectFor(activationName: string): string {
-  return `Your entry code for ${activationName}`;
+export function subjectFor(activationName: string, entryCode: string | null = null): string {
+  return entryCode
+    ? `Your entry code for ${activationName}`
+    : `You're registered for ${activationName}`;
 }
 
 const DEFAULT_BODY_COPY = `Keep this email — it's the only place you'll find your code if you close the page.`;
@@ -184,13 +189,19 @@ export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
     emailFooter,
   } = args;
 
-  const showEntryCode = emailShowEntryCode !== false;
+  // The entry-code block only renders when there's a code to show AND the
+  // admin hasn't hidden it. Without a code (activation has no prefix) the
+  // email still sends — just without the code section and with a generic
+  // "you're registered" heading.
+  const showEntryCode = !!entryCode && emailShowEntryCode !== false;
   const showEndDate = emailShowEndDate !== false;
 
   const defaultHeading =
     cause === "resend"
       ? `Here's your entry code again, as requested.`
-      : `You're registered for ${activationName}. Here's your entry code:`;
+      : showEntryCode
+        ? `You're registered for ${activationName}. Here's your entry code:`
+        : `You're registered for ${activationName}.`;
   const heading = cause !== "resend" && emailHeading?.trim() ? emailHeading.trim() : defaultHeading;
   const bodyCopy = emailBodyCopy?.trim() || DEFAULT_BODY_COPY;
   const footer = emailFooter?.trim() || `— The MrQ Activation team`;
@@ -202,7 +213,7 @@ export function plainTextFor(args: EntryCodeConfirmationEmailProps): string {
 
   if (bodyPlainText) lines.push(bodyPlainText, ``);
 
-  if (showEntryCode) lines.push(entryCode, ``, bodyCopy, ``);
+  if (showEntryCode && entryCode) lines.push(entryCode, ``, bodyCopy, ``);
 
   if (showEndDate) lines.push(`The activation runs until ${formatActivationEndDate(activationEndsAt)}.`, ``);
 
@@ -234,7 +245,9 @@ export function EntryCodeConfirmationEmail({
   const formattedEndDate = formatActivationEndDate(activationEndsAt);
   const isResend = cause === "resend";
 
-  const showEntryCode = emailShowEntryCode !== false;
+  // Mirrors `plainTextFor`: hide the code section when there's no code OR
+  // the admin opted out. Keeps the email send unconditional on verification.
+  const showEntryCode = !!entryCode && emailShowEntryCode !== false;
   const showEndDate = emailShowEndDate !== false;
 
   const defaultHeading = isResend
@@ -245,9 +258,11 @@ export function EntryCodeConfirmationEmail({
   const bodyCopy = emailBodyCopy?.trim() || DEFAULT_BODY_COPY;
   const footer = emailFooter?.trim() || `— The MrQ Activation team`;
 
-  const defaultPreviewText = isResend
+  const defaultPreviewText = isResend && entryCode
     ? `Here's your entry code again for ${activationName}: ${entryCode}. Keep this email.`
-    : `Your entry code for ${activationName}: ${entryCode}. Keep this email.`;
+    : entryCode
+      ? `Your entry code for ${activationName}: ${entryCode}. Keep this email.`
+      : `You're registered for ${activationName}. Keep this email.`;
   const previewText = emailPreheader?.trim() || defaultPreviewText;
 
   const bodyNodes = renderBodyDoc(emailBodyContent);
@@ -278,9 +293,11 @@ export function EntryCodeConfirmationEmail({
                       </span>
                     </Column>
                     <Column align="right">
-                      <Text style={{ margin: 0, fontFamily: MONO, fontSize: 11, color: "#a8a29e", letterSpacing: "0.5px" }}>
-                        Entry code
-                      </Text>
+                      {showEntryCode && (
+                        <Text style={{ margin: 0, fontFamily: MONO, fontSize: 11, color: "#a8a29e", letterSpacing: "0.5px" }}>
+                          Entry code
+                        </Text>
+                      )}
                     </Column>
                   </Row>
                 </Column>

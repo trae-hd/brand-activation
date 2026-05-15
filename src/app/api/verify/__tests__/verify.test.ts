@@ -366,7 +366,7 @@ describe("/api/verify — post-verify audit + email", () => {
     expect(actions).not.toContain("participant.confirmation_email_failed");
   });
 
-  it("activation without entryCodePrefix: skips the confirmation email entirely (no entry code to convey)", async () => {
+  it("activation without entryCodePrefix: still sends the confirmation email with a null entry code", async () => {
     setupHappyPathVerifyMocks({ entryCodePrefix: null });
 
     const res = await callPost(makeRequest({ pendingToken: "t.s", otp: OTP }));
@@ -374,10 +374,13 @@ describe("/api/verify — post-verify audit + email", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ ok: true });
-    expect(mockSendEntryCodeConfirmation).not.toHaveBeenCalled();
+    expect(mockSendEntryCodeConfirmation).toHaveBeenCalledTimes(1);
+    expect(mockSendEntryCodeConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({ entryCode: null }),
+    );
 
     const actions = mockWriteAuditLog.mock.calls.map((c) => (c[0] as { action: string }).action);
     expect(actions).toContain("participant.verified");
-    expect(actions).not.toContain("participant.confirmation_email_sent");
+    expect(actions).toContain("participant.confirmation_email_sent");
   });
 });

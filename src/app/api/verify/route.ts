@@ -157,11 +157,13 @@ export async function POST(req: Request) {
         ipHash,
       });
 
-      // Only send when there's an entry code to convey AND we haven't already
-      // sent for this row. `confirmationEmailSentAt` is read pre-update so a
-      // re-entry race on the OTP gate (Redis DEL is non-atomic with the email
-      // send) doesn't double-send.
-      if (entryCode && reg.confirmationEmailSentAt === null && activation) {
+      // Send the post-verify confirmation email on every successful verification,
+      // not only when an entry code exists. Activations without an
+      // `entryCodePrefix` still get a "you're registered" email — the template
+      // and subject auto-adjust when `entryCode` is null.
+      // `confirmationEmailSentAt` is read pre-update so a re-entry race on the
+      // OTP gate (Redis DEL is non-atomic with the email send) doesn't double-send.
+      if (reg.confirmationEmailSentAt === null && activation) {
         const supportEmail = env.SUPPORT_EMAIL ?? env.EMAIL_FROM;
         const result = await emailProvider.sendEntryCodeConfirmation({
           to: reg.email,

@@ -25,8 +25,9 @@ export const devProvider: EmailProvider = {
     return { ok: true, messageId: DEV_MESSAGE_ID };
   },
   async sendEntryCodeConfirmation({ to, entryCode, activationName, cause }) {
+    const codePart = entryCode ?? "(no entry code)";
     console.log(
-      `[devProvider] entry code confirmation (cause=${cause}) to ${to} — ${entryCode} for ${activationName} (no-op)`,
+      `[devProvider] entry code confirmation (cause=${cause}) to ${to} — ${codePart} for ${activationName} (no-op)`,
     );
     return { ok: true, messageId: DEV_MESSAGE_ID };
   },
