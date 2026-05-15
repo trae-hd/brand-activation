@@ -61,9 +61,16 @@ export function DashboardClient({
   );
 
   const [secondsSince, setSecondsSince] = useState(0);
+  // Reset the counter as soon as a fresh query result arrives. React 19
+  // disallows the equivalent setState-in-effect (cascading renders); doing
+  // it during render with a "last seen" guard is the recommended pattern.
+  const [lastUpdate, setLastUpdate] = useState(dataUpdatedAt);
+  if (dataUpdatedAt !== lastUpdate) {
+    setLastUpdate(dataUpdatedAt);
+    setSecondsSince(0);
+  }
   useEffect(() => {
     if (!dataUpdatedAt) return;
-    setSecondsSince(0);
     const id = setInterval(() => {
       setSecondsSince(Math.floor((Date.now() - dataUpdatedAt) / 1_000));
     }, 1_000);

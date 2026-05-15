@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { trpcReact } from "@/lib/trpc/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,15 +102,20 @@ export function PickWinnersDialog({
   );
 
   // Auto-recompute reserves when winners changes — but only if the user
-  // hasn't manually edited reserves yet.
-  useEffect(() => {
+  // hasn't manually edited reserves yet. React 19 prefers a render-time
+  // conditional setState over a setState-in-effect (cascading renders).
+  const [lastWinnerCount, setLastWinnerCount] = useState(winnerCount);
+  if (winnerCount !== lastWinnerCount) {
+    setLastWinnerCount(winnerCount);
     if (!reserveCountTouched) {
       setReserveCount(defaultReserves(winnerCount));
     }
-  }, [winnerCount, reserveCountTouched]);
+  }
 
   // Reset state when the dialog closes so the next open starts fresh.
-  useEffect(() => {
+  const [lastOpen, setLastOpen] = useState(open);
+  if (open !== lastOpen) {
+    setLastOpen(open);
     if (!open) {
       setMode("compose");
       setWinnerCount(1);
@@ -123,7 +128,7 @@ export function PickWinnersDialog({
       setRevealedSelectionIds(new Set());
       setCopyState("idle");
     }
-  }, [open]);
+  }
 
   // ── Live eligibility preview ───────────────────────────────────────
   const previewQuery = trpcReact.winner.previewEligiblePool.useQuery(

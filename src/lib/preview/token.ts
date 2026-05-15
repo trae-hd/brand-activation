@@ -5,8 +5,12 @@ function hourBucket(): number {
   return Math.floor(Date.now() / (1000 * 3600));
 }
 
+function previewSecret(): string {
+  return env.PREVIEW_TOKEN_SECRET ?? env.NEXTAUTH_SECRET;
+}
+
 function computeHmac(activationId: string, hour: number): string {
-  return createHmac("sha256", env.NEXTAUTH_SECRET)
+  return createHmac("sha256", previewSecret())
     .update(`preview:${activationId}:${hour}`)
     .digest("base64url");
 }

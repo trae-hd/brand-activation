@@ -163,3 +163,54 @@ All three rows have `actorId: NULL` (system-initiated) and an `ipHash` from the 
 
 1. Same hash lookup as above.
 2. `… WHERE action = 'participant.resend_rate_limited' AND "metadata"->>'emailHash' = '<hash>'` shows every denial with `metadata.scope` indicating which limiter fired (`ip` for blanket scraping; `activation_email` for the per-`(activationId, emailHash)` cap).
+
+---
+
+## HMAC Key Rotation
+
+The four hashing keys — `EMAIL_HASH_HMAC_KEY`, `IP_HMAC_KEY`, `USER_AGENT_HMAC_KEY`, `OTP_HMAC_KEY` — and the four token-signing secrets — `PENDING_TOKEN_SECRET`, `INVITE_TOKEN_HMAC_KEY`, `RESET_TOKEN_HMAC_KEY`, `PREVIEW_TOKEN_SECRET` — have independent rotation postures. **Do not rotate the email key casually**: it underpins the `(activationId, emailHash)` dedup invariant (§5.1) and the right-to-erasure-by-hash flow (§14.3). The IP / UA / OTP / token keys can be rotated freely.
+
+### When to rotate
+
+- **Routine:** every 12 months as part of the annual key-hygiene review.
+- **Forced:** any time a key may have leaked (audit log dump exposed, env-var snapshot in an error report, ex-engineer with prod access).
+
+### Rotation procedure — token-signing keys (low risk)
+
+`PENDING_TOKEN_SECRET`, `INVITE_TOKEN_HMAC_KEY`, `RESET_TOKEN_HMAC_KEY`, `PREVIEW_TOKEN_SECRET`, `OTP_HMAC_KEY`:
+
+1. Generate a new key: `openssl rand -hex 32`.
+2. In Railway, update the env var. Deploy.
+3. Outstanding tokens issued under the old key will become invalid. For OTP / pending tokens this is fine (10-minute TTL — affected users just re-register). For invite / reset tokens (24h TTL), notify the team and re-send any pending invites the next day.
+
+### Rotation procedure — IP / UA hash keys (medium risk)
+
+`IP_HMAC_KEY`, `USER_AGENT_HMAC_KEY`:
+
+1. Existing `ipHash` / `userAgentHash` values in `AuditLog` and `Registration` were computed with the old key — they remain valid as opaque correlation IDs for past data, but new writes will use the new key and won't match historical rows.
+2. Generate a new key, update Railway, deploy.
+3. Document the rotation timestamp in this runbook so future audit-log forensics know the discontinuity point.
+
+### Rotation procedure — email hash key (high risk, manual data migration)
+
+`EMAIL_HASH_HMAC_KEY`:
+
+> ⚠️ Rotating this key without re-hashing breaks dedup and erasure. Do not rotate in production without scheduled downtime and a tested migration script.
+
+1. Schedule a maintenance window — registrations must be paused (set all LIVE activations to PAUSED via admin UI).
+2. Generate the new key but **do not** swap it in yet.
+3. Write a one-shot script in `workers/` that reads every `Registration` row, recomputes `emailHash` from `email` using the new key (`HMAC-SHA256(new_key, lower(email))`, hex output), and writes it back inside a single transaction per row. The same script must update every `AuditLog.metadata->>'emailHash'` value where present — use the `(action, createdAt)` index to walk in time-ordered batches of 1000.
+4. Run the script against a staging clone first. Verify row counts and a spot-check of erasure SQL (§14.3) still resolves rows after the migration.
+5. In production: take a fresh DB snapshot, run the migration, swap the env var, re-deploy.
+6. Re-enable activations.
+
+### Audit-log row to write
+
+After any rotation, write an audit row by hand from the admin Postgres console so future ops know it happened:
+
+```sql
+INSERT INTO "AuditLog" (id, category, action, "actorId", "targetType", "targetId", metadata, "createdAt")
+VALUES (gen_random_uuid(), 'SECURITY', 'system.key_rotated', NULL, 'Env', NULL,
+        jsonb_build_object('key', 'EMAIL_HASH_HMAC_KEY', 'reason', 'routine_12_month'),
+        now());
+```

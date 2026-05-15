@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,10 +26,15 @@ function WorkspaceTab({ role }: { role: "ADMIN" | "MEMBER" }) {
   const [form, setForm] = useState<WorkspaceSettingsOutput | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [seededFrom, setSeededFrom] = useState<WorkspaceSettingsOutput | null>(null);
 
-  useEffect(() => {
-    if (data && !form) setForm(data);
-  }, [data, form]);
+  // Seed the editable form from server data once it arrives. React 19 prefers
+  // a conditional setState during render over an effect for this pattern —
+  // an effect would queue an extra render and trigger the cascading-render lint.
+  if (data && data !== seededFrom && !form) {
+    setSeededFrom(data);
+    setForm(data);
+  }
 
   const isAdmin = role === "ADMIN";
 
@@ -209,13 +214,15 @@ function ProfileTab() {
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [seededFromMe, setSeededFromMe] = useState<typeof me | null>(null);
 
-  useEffect(() => {
-    if (me) {
-      setName(me.name);
-      setEmail(me.email);
-    }
-  }, [me]);
+  // Seed from server data on first arrival (React 19: prefer render-time
+  // conditional setState over a same-render effect — see WorkspaceTab).
+  if (me && me !== seededFromMe) {
+    setSeededFromMe(me);
+    setName(me.name);
+    setEmail(me.email);
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

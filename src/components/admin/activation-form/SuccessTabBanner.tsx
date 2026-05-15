@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 
 const DISMISSED_KEY_PREFIX = "mrq:successTabBannerDismissed:";
@@ -11,14 +11,14 @@ interface Props {
 }
 
 export function SuccessTabBanner({ activationId, mode }: Props) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (mode !== "create" || !activationId) return;
-    const key = `${DISMISSED_KEY_PREFIX}${activationId}`;
-    const dismissed = sessionStorage.getItem(key);
-    if (!dismissed) setVisible(true);
-  }, [activationId, mode]);
+  // Read sessionStorage in a lazy initializer so visibility is correct on the
+  // first render. SSR-safe via the `typeof window` guard; React 19 prefers
+  // this over a same-render setState-in-effect.
+  const [visible, setVisible] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    if (mode !== "create" || !activationId) return false;
+    return !sessionStorage.getItem(`${DISMISSED_KEY_PREFIX}${activationId}`);
+  });
 
   if (!visible) return null;
 

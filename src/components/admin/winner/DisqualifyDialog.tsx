@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { trpcReact } from "@/lib/trpc/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,13 +47,16 @@ export function DisqualifyDialog({
   const [error, setError] = useState<string | null>(null);
   const utils = trpcReact.useUtils();
 
-  // Reset on close so the next open starts clean.
-  useEffect(() => {
+  // Reset on close so the next open starts clean. React 19 prefers a
+  // render-time conditional setState over a setState-in-effect (cascading).
+  const [lastOpen, setLastOpen] = useState(open);
+  if (open !== lastOpen) {
+    setLastOpen(open);
     if (!open) {
       setReason("");
       setError(null);
     }
-  }, [open]);
+  }
 
   const mutation = trpcReact.winner.disqualifySelection.useMutation({
     onSuccess: async () => {

@@ -39,6 +39,10 @@ const schema = z.object({
   PENDING_TOKEN_SECRET: z.string().min(32),
   INVITE_TOKEN_HMAC_KEY: z.string().min(32),
   RESET_TOKEN_HMAC_KEY: z.string().min(32),
+  // Optional — short-lived (1–2h) preview link signing key. Falls back to
+  // NEXTAUTH_SECRET when absent so existing deploys keep working; set
+  // explicitly to allow independent rotation.
+  PREVIEW_TOKEN_SECRET: z.string().min(32).optional(),
 
   // Hosts
   PARTICIPANT_HOST: z.string().min(1),

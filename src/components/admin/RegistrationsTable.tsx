@@ -146,9 +146,14 @@ export function RegistrationsTable({
 
   // Reset to page 1 whenever a filter or page size changes — otherwise we
   // could land on a page index that no longer exists in the new result set.
-  useEffect(() => {
+  // React 19 flags setState-in-effect as cascading; comparing against a
+  // tracked key during render achieves the same with one fewer render.
+  const filterKey = `${statusFilter}|${String(mrqConsentFilter)}|${pageSize}|${entryCodeSearch}`;
+  const [lastFilterKey, setLastFilterKey] = useState(filterKey);
+  if (filterKey !== lastFilterKey) {
+    setLastFilterKey(filterKey);
     setPage(1);
-  }, [statusFilter, mrqConsentFilter, pageSize, entryCodeSearch]);
+  }
 
   const debouncedEntryCodeSearch = useDebounced(entryCodeSearch, 300);
 
