@@ -200,6 +200,7 @@ export function RegistrationForm(props: Props) {
           />
           <label htmlFor="reg-consent-mrq" className="text-sm leading-snug min-w-0">
             I agree to be contacted by MrQ if I am selected as a winner.
+            <span className="text-destructive ml-0.5" aria-label="required">*</span>
           </label>
         </div>
       )}
