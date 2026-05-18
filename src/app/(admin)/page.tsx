@@ -20,7 +20,7 @@ export default async function AdminHomePage() {
       archivedAt: true,
       _count: { select: { booths: true } },
       registrations: {
-        where: { status: { in: ["VERIFIED", "PENDING"] } },
+        where: { status: { in: ["VERIFIED", "PENDING"] }, isTest: false },
         select: { status: true },
       },
     },
