@@ -113,6 +113,7 @@ import {
   Ban,
   Filter,
   Download,
+  FlaskConical,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -237,6 +238,7 @@ export const icons = createIconMap({
   Ban,
   Filter,
   Download,
+  FlaskConical,
 });
 
 /** Union of all valid icon names in the registry. */

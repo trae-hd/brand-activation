@@ -244,6 +244,12 @@ model Registration {
   /// the winner-picking shuffle respects this.
   excluded Boolean @default(false)
 
+  /// Admin-set flag marking this row as a test entry (e.g. a staff member
+  /// registering on a live activation to verify the flow). Test rows are
+  /// filtered out of CSV exports, the winner-picker eligibility pool, and
+  /// every dashboard counter. Toggle from the registrations table.
+  isTest Boolean @default(false)
+
   // ── Winner-picking back-relations ──
   winnerSelections  WinnerDrawSelection[]
   winnerPoolEntries WinnerDrawPoolEntry[]

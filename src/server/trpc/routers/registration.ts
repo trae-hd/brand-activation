@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router } from "../init";
-import { memberProcedure } from "../procedures";
+import { memberProcedure, adminProcedure } from "../procedures";
 import { prisma } from "@/lib/db/prisma";
 import { writeAuditLog } from "@/lib/audit/writeAuditLog";
 import type {
@@ -31,6 +31,9 @@ interface RegistrationRow {
   /** Admin-set flag excluding this registration from future winner draws.
    *  Surfaces as a 🚫 indicator on the registrations table per §1.6.D. */
   excluded: boolean;
+  /** Admin-set flag marking this row as a test entry. Test rows are filtered
+   *  out of CSV exports, the winner-picker pool, and all dashboard counters. */
+  isTest: boolean;
   /** Most recent non-disqualified winner-draw selection for this registration
    *  (across all draws on this activation), or null if none. Surfaces as a
    *  trophy/star indicator per §1.6.D. The Selection model's @@unique
@@ -53,10 +56,10 @@ export const registrationRouter = router({
     .query(async ({ input }): Promise<{ verified: number; pending: number }> => {
       const [verified, pending] = await Promise.all([
         prisma.registration.count({
-          where: { activationId: input.activationId, status: "VERIFIED" },
+          where: { activationId: input.activationId, status: "VERIFIED", isTest: false },
         }),
         prisma.registration.count({
-          where: { activationId: input.activationId, status: "PENDING" },
+          where: { activationId: input.activationId, status: "PENDING", isTest: false },
         }),
       ]);
       return { verified, pending };
@@ -78,20 +81,22 @@ export const registrationRouter = router({
         recentVerifications,
         boothBreakdown,
         utmSourceBreakdown,
+        testCount,
       ] = await Promise.all([
         prisma.registration.count({
-          where: { activationId: input.activationId, status: "VERIFIED" },
+          where: { activationId: input.activationId, status: "VERIFIED", isTest: false },
         }),
         prisma.registration.count({
-          where: { activationId: input.activationId, status: "PENDING" },
+          where: { activationId: input.activationId, status: "PENDING", isTest: false },
         }),
         prisma.registration.count({
-          where: { activationId: input.activationId, boothCode: { not: null } },
+          where: { activationId: input.activationId, boothCode: { not: null }, isTest: false },
         }),
         prisma.registration.count({
           where: {
             activationId: input.activationId,
             status: "VERIFIED",
+            isTest: false,
             verifiedAt: { gte: fiveMinutesAgo },
           },
         }),
@@ -99,6 +104,7 @@ export const registrationRouter = router({
           where: {
             activationId: input.activationId,
             status: "VERIFIED",
+            isTest: false,
             verifiedAt: { not: null },
           },
           select: { registeredAt: true, verifiedAt: true },
@@ -109,6 +115,7 @@ export const registrationRouter = router({
           where: {
             activationId: input.activationId,
             status: "VERIFIED",
+            isTest: false,
             verifiedAt: { gte: sixtyMinutesAgo },
           },
           select: { verifiedAt: true },
@@ -116,14 +123,17 @@ export const registrationRouter = router({
         }),
         prisma.registration.groupBy({
           by: ["boothCode"],
-          where: { activationId: input.activationId, boothCode: { not: null } },
+          where: { activationId: input.activationId, boothCode: { not: null }, isTest: false },
           _count: { _all: true },
         }),
         prisma.registration.groupBy({
           by: ["utmSource"],
-          where: { activationId: input.activationId, status: "VERIFIED" },
+          where: { activationId: input.activationId, status: "VERIFIED", isTest: false },
           _count: { _all: true },
           orderBy: { _count: { utmSource: "desc" } },
+        }),
+        prisma.registration.count({
+          where: { activationId: input.activationId, isTest: true },
         }),
       ]);
 
@@ -176,6 +186,10 @@ export const registrationRouter = router({
         sparkline,
         booths,
         utmBreakdown,
+        // Count of rows flagged as test by an admin. All other counters in
+        // this payload exclude them; we surface the total so the dashboard
+        // can disclose that exclusion to viewers.
+        testCount,
       };
     }),
 
@@ -187,6 +201,11 @@ export const registrationRouter = router({
         pageSize: z.number().int().min(1).max(100).default(25),
         status: StatusFilterSchema,
         mrqContactConsent: z.boolean().optional(),
+        /** When `true`, return only admin-flagged test rows. When omitted,
+         *  the filter is off — both real and test rows are returned. There
+         *  is no `false` case in v1: hiding tests entirely is the job of the
+         *  dashboard / CSV / winner-picker, not the table. */
+        isTest: z.boolean().optional(),
         // Substring match against the entryCode column. Client passes whatever
         // the user typed (typically the suffix after the activation prefix —
         // the prefix is rendered as a non-editable affix in the search input);
@@ -201,6 +220,11 @@ export const registrationRouter = router({
       }): Promise<{
         items: RegistrationRow[];
         total: number;
+        /** Subset of `total` that are admin-flagged test rows. Surfaced so
+         *  the table header can split the count ("108 · 2 tests") and stay
+         *  consistent with the dashboard / CSV / winner-picker, all of
+         *  which exclude tests. */
+        testCount: number;
         page: number;
         pageSize: number;
         totalPages: number;
@@ -215,15 +239,17 @@ export const registrationRouter = router({
           input.entryCodeQuery && input.entryCodeQuery.trim().length > 0
             ? { entryCode: { contains: input.entryCodeQuery.trim(), mode: "insensitive" as const } }
             : {};
+        const testWhere = input.isTest === true ? { isTest: true } : {};
 
         const where = {
           activationId: input.activationId,
           ...statusWhere,
           ...consentWhere,
           ...entryCodeWhere,
+          ...testWhere,
         };
 
-        const [rows, total] = await Promise.all([
+        const [rows, total, testCount] = await Promise.all([
           prisma.registration.findMany({
             where,
             orderBy: { registeredAt: "desc" },
@@ -249,6 +275,7 @@ export const registrationRouter = router({
               mrqContactConsent: true,
               consentItemsAccepted: true,
               excluded: true,
+              isTest: true,
               // Most recent non-disqualified winner selection for this row.
               // The @@unique([activationId, registrationId]) constraint means
               // at most one such row exists per activation; we still take(1)
@@ -267,11 +294,16 @@ export const registrationRouter = router({
             },
           }),
           prisma.registration.count({ where }),
+          // Count of test rows within the *currently-filtered* set, so the
+          // header reflects what the user is actually looking at (e.g.
+          // "Verified · 87 · 2 tests" when the Verified pill is active).
+          prisma.registration.count({ where: { ...where, isTest: true } }),
         ]);
 
         return {
           items: rows,
           total,
+          testCount,
           page: input.page,
           pageSize: input.pageSize,
           totalPages: Math.max(1, Math.ceil(total / input.pageSize)),
@@ -321,6 +353,31 @@ export const registrationRouter = router({
         metadata: { reason: "admin-reveal" },
       });
       return { ok: true as const };
+    }),
+
+  toggleTest: adminProcedure
+    .input(
+      z.object({
+        registrationId: z.string().min(1),
+        isTest: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const actorId = ctx.session.user.adminUserId ?? null;
+      const updated = await prisma.registration.update({
+        where: { id: input.registrationId },
+        data: { isTest: input.isTest },
+        select: { id: true, activationId: true, emailHash: true, isTest: true },
+      });
+      await writeAuditLog({
+        category: "ADMIN",
+        action: input.isTest ? "registration.test_flagged" : "registration.test_unflagged",
+        actorId,
+        targetType: "Registration",
+        targetId: updated.id,
+        metadata: { activationId: updated.activationId, emailHash: updated.emailHash },
+      });
+      return { id: updated.id, isTest: updated.isTest };
     }),
 
   revealAllEmails: memberProcedure

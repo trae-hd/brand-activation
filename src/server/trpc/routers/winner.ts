@@ -35,6 +35,7 @@ function eligibilityWhere({
     status: "VERIFIED",
     mrqContactConsent: true,
     excluded: false,
+    isTest: false,
     verifiedAt: { lte: cutoff },
     ...(mrqAccountOnly ? { mrqAccountStatus: "ACTIVE" as const } : {}),
     // Exclude any registration already on a draw for this activation —
@@ -282,6 +283,7 @@ export const winnerRouter = router({
               AND r."status" = 'VERIFIED'
               AND r."mrqContactConsent" = TRUE
               AND r."excluded" = FALSE
+              AND r."isTest" = FALSE
               AND r."verifiedAt" <= ${cutoff}
               ${mrqClause}
               AND r.id NOT IN (
@@ -308,6 +310,7 @@ export const winnerRouter = router({
               AND r."status" = 'VERIFIED'
               AND r."mrqContactConsent" = TRUE
               AND r."excluded" = FALSE
+              AND r."isTest" = FALSE
               AND r."verifiedAt" <= ${cutoff}
               ${mrqClause}
               AND r.id NOT IN (

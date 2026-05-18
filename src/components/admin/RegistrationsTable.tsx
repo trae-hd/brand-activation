@@ -138,6 +138,7 @@ export function RegistrationsTable({
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [mrqConsentFilter, setMrqConsentFilter] = useState<boolean | null>(null);
+  const [testsOnlyFilter, setTestsOnlyFilter] = useState<boolean>(false);
   const [search, setSearch] = useState(""); // client-side filter on current page (email/hash)
   const [entryCodeSearch, setEntryCodeSearch] = useState(""); // server-side, suffix only
   const [page, setPage] = useState(1);
@@ -148,7 +149,7 @@ export function RegistrationsTable({
   // could land on a page index that no longer exists in the new result set.
   // React 19 flags setState-in-effect as cascading; comparing against a
   // tracked key during render achieves the same with one fewer render.
-  const filterKey = `${statusFilter}|${String(mrqConsentFilter)}|${pageSize}|${entryCodeSearch}`;
+  const filterKey = `${statusFilter}|${String(mrqConsentFilter)}|${testsOnlyFilter}|${pageSize}|${entryCodeSearch}`;
   const [lastFilterKey, setLastFilterKey] = useState(filterKey);
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey);
@@ -160,6 +161,8 @@ export function RegistrationsTable({
   const revealMutation = trpcReact.registration.revealEmail.useMutation();
   const revealAllMutation = trpcReact.registration.revealAllEmails.useMutation();
   const enrichMutation = trpcReact.registration.enrich.useMutation();
+  const toggleTestMutation = trpcReact.registration.toggleTest.useMutation();
+  const canToggleTest = userRole === "ADMIN";
 
   const { data, refetch, isFetching } = trpcReact.registration.list.useQuery({
     activationId,
@@ -167,12 +170,16 @@ export function RegistrationsTable({
     pageSize,
     status: statusFilter,
     mrqContactConsent: mrqConsentFilter ?? undefined,
+    isTest: testsOnlyFilter ? true : undefined,
     entryCodeQuery: debouncedEntryCodeSearch.trim() || undefined,
   });
 
   const items = data?.items ?? [];
   const total = data?.total ?? null;
+  const testCount = data?.testCount ?? 0;
   const totalPages = data?.totalPages ?? 1;
+  // Real (non-test) count for the header — matches dashboard/CSV/winner math.
+  const realCount = total != null ? total - testCount : null;
 
   const searchLower = search.toLowerCase();
   const visibleItems = searchLower
@@ -224,13 +231,30 @@ export function RegistrationsTable({
     await refetch();
   }
 
+  async function handleToggleTest(id: string, nextIsTest: boolean) {
+    await toggleTestMutation.mutateAsync({ registrationId: id, isTest: nextIsTest });
+    await refetch();
+  }
+
   return (
     <div className="space-y-3">
       {/* Header — mobile-first: title sits on its own row on narrow screens
           and actions wrap below; on sm+ they share the row with justify-between. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="text-xl font-semibold">
-          Registrations{total != null ? ` · ${total}` : ""}
+          Registrations
+          {/* When the "Tests only" filter is active every row is a test, so
+              showing "· 0 · 2 tests" would be misleading. Suppress the real
+              count in that case and let the amber suffix carry the number. */}
+          {realCount != null && !testsOnlyFilter && <span> · {realCount}</span>}
+          {testCount > 0 && (
+            <span
+              className="ml-2 text-sm font-normal text-amber-600 dark:text-amber-400"
+              title="Tests are excluded from this count, the dashboard counters, the CSV export, and the winner picker."
+            >
+              · {testCount} test{testCount === 1 ? "" : "s"}
+            </span>
+          )}
         </h2>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {items.length > 0 && (
@@ -317,6 +341,24 @@ export function RegistrationsTable({
             </button>
           </>
         )}
+        <span className="text-border select-none">|</span>
+        <button
+          onClick={() => setTestsOnlyFilter((f) => !f)}
+          className={
+            testsOnlyFilter
+              ? "flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300"
+              : "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+          }
+          aria-pressed={testsOnlyFilter}
+          title={
+            testsOnlyFilter
+              ? "Showing only test entries. Click to show all."
+              : "Filter to only admin-flagged test entries."
+          }
+        >
+          <DynamicIcon name="FlaskConical" className="h-3 w-3" />
+          Tests only
+        </button>
         <div className="flex-1" />
         {hasEntryCodes && (
           <div className="flex h-8 items-center overflow-hidden rounded-md border bg-background text-sm focus-within:ring-1 focus-within:ring-ring">
@@ -427,6 +469,15 @@ export function RegistrationsTable({
                             />
                           </span>
                         )}
+                        {r.isTest && (
+                          <span
+                            title="Test entry — excluded from export, winner draws, and dashboard counts"
+                            aria-label="Test entry"
+                            className="text-amber-600 dark:text-amber-400"
+                          >
+                            <DynamicIcon name="FlaskConical" className="h-3.5 w-3.5" />
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-2.5 tabular-nums text-muted-foreground whitespace-nowrap">
@@ -479,18 +530,35 @@ export function RegistrationsTable({
                       {fmtDate(r.mrqRegisteredAt)}
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => handleToggleReveal(r.id)}
-                        disabled={revealMutation.isPending}
-                        className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
-                        aria-label={isRevealed ? "Hide email" : "Reveal email"}
-                        title={isRevealed ? "Hide email" : "Reveal email"}
-                      >
-                        <DynamicIcon
-                          name={isRevealed ? "EyeOff" : "Eye"}
-                          className="h-3.5 w-3.5"
-                        />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {canToggleTest && (
+                          <button
+                            onClick={() => handleToggleTest(r.id, !r.isTest)}
+                            disabled={toggleTestMutation.isPending}
+                            className={
+                              r.isTest
+                                ? "rounded p-1 text-amber-600 dark:text-amber-400 hover:bg-muted/50 disabled:opacity-50"
+                                : "rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
+                            }
+                            aria-label={r.isTest ? "Unmark test entry" : "Mark as test entry"}
+                            title={r.isTest ? "Unmark test entry" : "Mark as test entry"}
+                          >
+                            <DynamicIcon name="FlaskConical" className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleToggleReveal(r.id)}
+                          disabled={revealMutation.isPending}
+                          className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
+                          aria-label={isRevealed ? "Hide email" : "Reveal email"}
+                          title={isRevealed ? "Hide email" : "Reveal email"}
+                        >
+                          <DynamicIcon
+                            name={isRevealed ? "EyeOff" : "Eye"}
+                            className="h-3.5 w-3.5"
+                          />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

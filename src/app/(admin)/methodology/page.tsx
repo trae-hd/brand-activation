@@ -846,6 +846,7 @@ by a member of the MrQ team (mrq.com)."`}</Formula>
                 <li>Registration status is <code>VERIFIED</code> (pending and expired entries never participate).</li>
                 <li>The participant ticked <strong>&ldquo;agree to be contacted by MrQ&rdquo;</strong> at registration. We can&apos;t legally contact someone about winning if they didn&apos;t consent.</li>
                 <li>The registration is <strong>not excluded</strong> (the <code>excluded</code> flag on the registration row, set manually by an admin via Prisma Studio in v1).</li>
+                <li>The registration is <strong>not flagged as a test entry</strong> (the <code>isTest</code> flag, toggled by admins from the registrations table). Test rows are also omitted from CSV exports and from every dashboard counter — the dashboard surfaces a banner with the count when any test rows exist.</li>
                 <li>The registration was verified <strong>before the eligibility cutoff</strong> for the draw. ENDED activations default to <code>endsAt</code>; LIVE activations default to the timestamp the draw was triggered.</li>
                 <li>The registration <strong>has not been on a previous draw for this activation</strong>, regardless of status. Disqualified registrations cannot be re-picked in a later draw — this prevents redrawing until a preferred outcome.</li>
               </ul>

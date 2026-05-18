@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import { statusBadgeClass } from "@/lib/activationStatus";
 import type { ActivationStatus } from "@prisma/client";
 
@@ -111,6 +112,23 @@ export function DashboardClient({
             aria-live="polite"
           >
             Updated {secondsSince}s ago
+          </span>
+        </div>
+      )}
+
+      {/* Test-exclusion disclosure. Counters here (verified, pending, scans,
+          sparkline, booth/UTM breakdowns) all exclude admin-flagged test
+          rows; surfacing the count makes the omission visible to anyone
+          looking at the dashboard. Hidden when no test rows exist. */}
+      {data && data.testCount > 0 && (
+        <div
+          className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"
+          role="note"
+        >
+          <DynamicIcon name="FlaskConical" className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {data.testCount} test {data.testCount === 1 ? "entry" : "entries"} excluded
+            from these counts, the CSV export, and the winner picker.
           </span>
         </div>
       )}

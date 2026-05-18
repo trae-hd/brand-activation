@@ -48,7 +48,13 @@ export async function GET(req: Request) {
   const consentLabels = parseConsentItemLabels(activation.consentItems);
   const actorId = session.user.adminUserId;
 
-  const baseWhere: Prisma.RegistrationWhereInput = { activationId, status: "VERIFIED" };
+  const baseWhere: Prisma.RegistrationWhereInput = {
+    activationId,
+    status: "VERIFIED",
+    // Test rows (admin-flagged) are never included in exports — they exist
+    // to verify the activation flow, not as real participant data.
+    isTest: false,
+  };
   if (mrqContactConsentFilter !== undefined) {
     baseWhere.mrqContactConsent = mrqContactConsentFilter;
   }
