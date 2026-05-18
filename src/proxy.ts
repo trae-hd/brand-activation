@@ -52,6 +52,11 @@ export function proxy(req: NextRequest) {
     return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
   }
 
+  // Admin API routes (CSV exports, DSAR, QR zip, etc.) are reachable only on the admin host.
+  if (path.startsWith("/api/admin/")) {
+    return host === adminHost ? NextResponse.next() : new NextResponse(null, { status: 404 });
+  }
+
   // Participant Route Handlers are reachable only on the participant host.
   if (
     path === "/api/register" ||
